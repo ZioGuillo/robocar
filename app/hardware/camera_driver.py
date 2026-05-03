@@ -1,6 +1,7 @@
-import io
 import logging
 import threading
+
+import numpy as np
 
 _log = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ try:
 
     _cam = Picamera2()
     _cam.configure(_cam.create_video_configuration(
-        main={"size": (640, 480), "format": "RGB888"},
+        main={"size": (640, 480), "format": "MJPEG"},
     ))
     available = True
     _backend = "picamera2"
@@ -28,16 +29,15 @@ except Exception:
 def _capture_loop() -> None:
     global _latest_frame, _frame_counter, _running
     try:
-        _log.info("camera: starting capture")
         _cam.start()
-        _log.info("camera: capture started, entering loop")
         while _running:
             request = _cam.capture_request()
             try:
-                buf = io.BytesIO()
-                request.save("main", buf, format="jpeg")
-                data = buf.getvalue()
-                if data:
+                buf = request.make_buffer("main")
+                # buf is a numpy array preallocated to max size; find actual JPEG end
+                ff_pos = np.where((buf[:-1] == 0xFF) & (buf[1:] == 0xD9))[0]
+                if len(ff_pos):
+                    data = bytes(buf[: int(ff_pos[-1]) + 2])
                     with _lock:
                         _latest_frame = data
                         _frame_counter += 1

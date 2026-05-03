@@ -10,6 +10,7 @@ EnvironmentFile=/home/pi/robocar/.env
 ExecStart=/home/pi/robocar-venv/bin/robocar
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=robocar

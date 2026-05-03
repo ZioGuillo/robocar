@@ -4,7 +4,6 @@ import threading
 import time
 from pathlib import Path
 
-from app.config import settings
 from app.hardware import camera_driver
 
 _log = logging.getLogger(__name__)
@@ -19,15 +18,18 @@ _lock = threading.Lock()
 _detections: list[dict] = []
 _running = False
 
-_MODEL_PATH = settings.data_dir / "models" / "mobilenet_ssd_v1.tflite"
-_LABELS_PATH = Path(__file__).parent.parent / "models" / "coco_labels.txt"
+_MODEL_PATH = Path("data/models/mobilenet_ssd_v1.tflite")
+_LABELS_PATH = Path("data/models/coco_labels.txt")
 
 model_found = _MODEL_PATH.exists() and _LABELS_PATH.exists()
 
 try:
     import numpy as np
-    import tflite_runtime.interpreter as tflite
     from PIL import Image
+    try:
+        import tflite_runtime.interpreter as tflite
+    except ImportError:
+        import ai_edge_litert.interpreter as tflite  # type: ignore[no-redef]
     library_available = True
 
     if model_found:

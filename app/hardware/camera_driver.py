@@ -1,5 +1,8 @@
 import io
+import logging
 import threading
+
+_log = logging.getLogger(__name__)
 
 available = False
 _cam = None
@@ -15,7 +18,6 @@ try:
     _cam = Picamera2()
     _cam.configure(_cam.create_video_configuration(
         main={"size": (640, 480), "format": "RGB888"},
-        controls={"FrameRate": 30},
     ))
     available = True
     _backend = "picamera2"
@@ -25,13 +27,15 @@ except Exception:
 
 def _capture_loop() -> None:
     global _latest_frame, _frame_counter, _running
-    _cam.start()
     try:
+        _log.info("camera: starting capture")
+        _cam.start()
+        _log.info("camera: capture started, entering loop")
         while _running:
             request = _cam.capture_request()
             try:
                 buf = io.BytesIO()
-                request.save("main", buf, format="jpeg", quality=75)
+                request.save("main", buf, format="jpeg")
                 data = buf.getvalue()
                 if data:
                     with _lock:
@@ -39,8 +43,14 @@ def _capture_loop() -> None:
                         _frame_counter += 1
             finally:
                 request.release()
+    except Exception as exc:
+        _log.error("camera capture loop error: %s", exc)
+        _running = False
     finally:
-        _cam.stop()
+        try:
+            _cam.stop()
+        except Exception:
+            pass
 
 
 def start() -> None:

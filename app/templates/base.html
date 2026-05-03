@@ -133,11 +133,13 @@
       background: #111;
       border: 1px solid var(--pico-muted-border-color);
     }
-    .pip-container iframe {
-      display: block; width: 100%; height: 200px; border: none;
+    .pip-container iframe,
+    .pip-container img {
+      display: block; width: 100%; height: 200px; border: none; object-fit: cover;
     }
     @media (min-width: 768px) {
-      .pip-container iframe { height: 220px; }
+      .pip-container iframe,
+      .pip-container img { height: 220px; }
     }
     .pip-placeholder {
       height: 200px; display: flex;
@@ -174,12 +176,14 @@
     .pt-btn.center-btn { background: var(--pico-secondary-background); }
 
     /* ── Camera tab ── */
-    .camera-stream iframe {
+    .camera-stream iframe,
+    .camera-stream img {
       width: 100%; height: 340px; border: none;
-      border-radius: 10px; background: #111;
+      border-radius: 10px; background: #111; object-fit: contain; display: block;
     }
     @media (min-width: 768px) {
-      .camera-stream iframe { height: 480px; }
+      .camera-stream iframe,
+      .camera-stream img { height: 480px; }
     }
     .camera-placeholder {
       height: 340px; background: #111; border-radius: 10px;

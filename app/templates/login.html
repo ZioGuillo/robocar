@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoboControl — Login</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #020817;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Space canvas ── */
+    #space-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    /* ── Login card ── */
+    .login-card {
+      position: relative;
+      z-index: 10;
+      width: min(420px, 92vw);
+      background: rgba(8, 16, 40, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(99, 155, 255, 0.18);
+      border-radius: 20px;
+      padding: 2.4rem 2rem;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,155,255,0.08);
+    }
+
+    /* ── Title ── */
+    .login-title {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: #e8eeff;
+      text-align: center;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Status indicator ── */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-bottom: 1.6rem;
+      font-size: 0.78rem;
+      color: #7a8ab0;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #374060;
+      flex-shrink: 0;
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .status-dot.ok    { background: #2dc653; box-shadow: 0 0 8px #2dc653; }
+    .status-dot.error { background: #e53935; box-shadow: 0 0 8px #e53935; }
+
+    /* ── Status messages ── */
+    .status-msg {
+      text-align: center;
+      font-size: 0.85rem;
+      padding: 0.55rem 0.9rem;
+      border-radius: 10px;
+      margin-bottom: 1.1rem;
+    }
+    .status-msg.error { background: rgba(229,57,53,0.15); color: #ef9a9a; border: 1px solid rgba(229,57,53,0.25); }
+    .status-msg.info  { background: rgba(99,155,255,0.1);  color: #90b4ff; border: 1px solid rgba(99,155,255,0.2); }
+
+    /* ── Form elements ── */
+    .field { margin-bottom: 1rem; }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #7a8ab0;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .field input {
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(99,155,255,0.2);
+      border-radius: 10px;
+      color: #e8eeff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      -webkit-appearance: none;
+    }
+    .field input:focus {
+      border-color: rgba(99,155,255,0.6);
+      background: rgba(255,255,255,0.08);
+    }
+    .field input::placeholder { color: #3a4a70; }
+
+    /* ── Sign in button ── */
+    .btn-primary {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 0.4rem;
+      background: linear-gradient(135deg, #3a6fff 0%, #1a3fcc 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover  { opacity: 0.9; }
+    .btn-primary:active { transform: scale(0.98); }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin: 1.2rem 0;
+      color: #3a4a70;
+      font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid rgba(99,155,255,0.12);
+    }
+
+    /* ── GitHub button ── */
+    .github-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      width: 100%;
+      padding: 0.7rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(99,155,255,0.18);
+      border-radius: 10px;
+      color: #c8d8ff;
+      font-size: 0.92rem;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .github-btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(99,155,255,0.4);
+      color: #fff;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .login-card { padding: 2rem 1.4rem; border-radius: 16px; }
+      .login-title { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="space-canvas"></canvas>
+
+<div class="login-card">
+  <h1 class="login-title">🤖 RoboControl</h1>
+
+  <div class="status-indicator">
+    <span class="status-dot" id="ping-dot"></span>
+    <span id="ping-label">Connecting…</span>
+  </div>
+
+  {% if status == "pending" %}
+  <p class="status-msg info">Your account is awaiting admin approval.</p>
+  {% elif status == "revoked" %}
+  <p class="status-msg error">Access denied. Contact the administrator.</p>
+  {% elif status == "error" %}
+  <p class="status-msg error">Authentication error. Please try again.</p>
+  {% elif status == "invalid" %}
+  <p class="status-msg error">Invalid username or password.</p>
+  {% endif %}
+
+  <form method="post" action="/login">
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username"
+             autocomplete="username" required autofocus placeholder="admin">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password"
+             autocomplete="current-password" required placeholder="••••••••">
+    </div>
+    <button type="submit" class="btn-primary">Sign in</button>
+  </form>
+
+  {% if github_enabled %}
+  <div class="divider">or</div>
+  <a href="/auth/github" class="github-btn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+    </svg>
+    Continue with GitHub
+  </a>
+  {% endif %}
+</div>
+
+<script>
+/* ── Space background ─────────────────────────────────────────── */
+(function () {
+  var canvas = document.getElementById('space-canvas');
+  var ctx    = canvas.getContext('2d');
+  var W, H, stars = [], planets = [], constellations = [];
+  var tick = 0;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    init();
+  }
+
+  function rand(min, max) { return min + Math.random() * (max - min); }
+  function randInt(min, max) { return Math.floor(rand(min, max)); }
+
+  function init() {
+    /* Stars */
+    stars = [];
+    var count = Math.floor(W * H / 2000);
+    for (var i = 0; i < count; i++) {
+      stars.push({
+        x: rand(0, W), y: rand(0, H),
+        r: rand(0.3, 1.8),
+        alpha: rand(0.4, 1),
+        speed: rand(0.002, 0.008),
+        phase: rand(0, Math.PI * 2)
+      });
+    }
+
+    /* Constellations — fixed patterns relative to canvas */
+    constellations = [];
+    var patterns = [
+      /* Orion-ish */
+      [[0.08,0.18],[0.12,0.22],[0.10,0.28],[0.14,0.32],[0.06,0.32],[0.10,0.38],[0.10,0.44]],
+      /* Big Dipper */
+      [[0.70,0.08],[0.76,0.10],[0.82,0.09],[0.87,0.12],[0.84,0.18],[0.78,0.20],[0.72,0.19]],
+      /* Small triangle */
+      [[0.55,0.55],[0.62,0.50],[0.58,0.62]],
+      /* Cross */
+      [[0.30,0.65],[0.30,0.75],[0.25,0.70],[0.35,0.70]],
+      /* Arrow */
+      [[0.80,0.55],[0.88,0.58],[0.80,0.61],[0.80,0.55],[0.92,0.58]]
+    ];
+    patterns.forEach(function(pts) {
+      constellations.push(pts.map(function(p) {
+        return { x: p[0]*W + rand(-8,8), y: p[1]*H + rand(-8,8) };
+      }));
+    });
+
+    /* Planets */
+    planets = [
+      { x: W*0.82, y: H*0.22, r: 18, color: '#c1440e', glow: '#ff6030', rings: false, name:'Mars' },
+      { x: W*0.15, y: H*0.72, r: 28, color: '#c88b3a', glow: '#ffb050', rings: true,  name:'Saturn' },
+      { x: W*0.90, y: H*0.78, r: 14, color: '#3a7fcf', glow: '#60aaff', rings: false, name:'Neptune' },
+      { x: W*0.40, y: H*0.12, r: 10, color: '#e8cfa0', glow: '#ffe0a0', rings: false, name:'Moon' }
+    ];
+  }
+
+  function drawPlanet(p) {
+    /* Glow */
+    var g = ctx.createRadialGradient(p.x, p.y, p.r*0.2, p.x, p.y, p.r*3);
+    g.addColorStop(0, p.glow.replace(')', ',0.25)').replace('rgb','rgba'));
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r*3, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    /* Body gradient */
+    var grad = ctx.createRadialGradient(p.x - p.r*0.3, p.y - p.r*0.3, p.r*0.05, p.x, p.y, p.r);
+    grad.addColorStop(0, lighten(p.color, 60));
+    grad.addColorStop(1, darken(p.color, 40));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    /* Saturn rings */
+    if (p.rings) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(1, 0.32);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.r*2.2, p.r*2.2, 0, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(200,160,80,0.45)';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.r*1.65, p.r*1.65, 0, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(200,160,80,0.25)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawConstellation(pts) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.strokeStyle = 'rgba(140,180,255,0.18)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    pts.forEach(function(p) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(180,210,255,0.7)';
+      ctx.fill();
+    });
+  }
+
+  function lighten(hex, amt) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.min(255, (n>>16) + amt);
+    var g = Math.min(255, ((n>>8)&0xff) + amt);
+    var b = Math.min(255, (n&0xff) + amt);
+    return 'rgb('+r+','+g+','+b+')';
+  }
+  function darken(hex, amt) { return lighten(hex, -amt); }
+
+  function draw() {
+    tick++;
+    /* Deep space gradient background */
+    var bg = ctx.createRadialGradient(W*0.5, H*0.5, 0, W*0.5, H*0.5, Math.max(W,H)*0.75);
+    bg.addColorStop(0,   '#0a1535');
+    bg.addColorStop(0.5, '#060e22');
+    bg.addColorStop(1,   '#020817');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    /* Stars */
+    stars.forEach(function(s) {
+      var a = s.alpha * (0.6 + 0.4 * Math.sin(tick * s.speed + s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(200,220,255,' + a + ')';
+      ctx.fill();
+    });
+
+    /* Constellations */
+    constellations.forEach(drawConstellation);
+
+    /* Planets */
+    planets.forEach(drawPlanet);
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+/* ── Ping status ─────────────────────────────────────────────── */
+(function ping() {
+  var dot = document.getElementById('ping-dot');
+  var lbl = document.getElementById('ping-label');
+  fetch('/api/ping').then(function(r) {
+    if (r.ok) { dot.className = 'status-dot ok'; lbl.textContent = 'Robot online'; }
+    else       { throw new Error(); }
+  }).catch(function() {
+    dot.className = 'status-dot error';
+    lbl.textContent = 'Robot unreachable';
+  }).finally(function() { setTimeout(ping, 5000); });
+})();
+</script>
+</body>
+</html>

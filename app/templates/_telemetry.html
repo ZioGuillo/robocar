@@ -1,0 +1,52 @@
+<div class="telemetry-grid">
+
+  <!-- Motor battery -->
+  <div class="telemetry-card">
+    <div class="tel-label">Motor Battery (9V)</div>
+    <div class="tel-value" id="tel-battery-motor" style="font-size:1rem;padding-top:.3rem">—</div>
+    <div class="tel-sub">powers motors</div>
+  </div>
+
+  <!-- Pi battery -->
+  <div class="telemetry-card">
+    <div class="tel-label">Pi Battery</div>
+    <div class="tel-value" id="tel-battery-pi" style="font-size:1rem;padding-top:.3rem">—</div>
+    <div class="tel-sub">powers Pi</div>
+  </div>
+
+  <!-- Uptime -->
+  <div class="telemetry-card">
+    <div class="tel-label">Uptime</div>
+    <div class="tel-value" id="tel-uptime">—</div>
+  </div>
+
+  <!-- Last command latency -->
+  <div class="telemetry-card">
+    <div class="tel-label">Last cmd latency</div>
+    <div class="tel-value" id="tel-latency">—</div>
+    <div class="tel-sub" id="tel-latency-bar"></div>
+  </div>
+
+  <!-- Commands sent -->
+  <div class="telemetry-card">
+    <div class="tel-label">Commands sent</div>
+    <div class="tel-value" id="tel-commands">—</div>
+  </div>
+
+  <!-- Obstacles -->
+  <div class="telemetry-card">
+    <div class="tel-label">Obstacles hit</div>
+    <div class="tel-value" id="tel-obstacles">—</div>
+    <div class="tel-sub" id="tel-last-obstacle"></div>
+  </div>
+
+  <!-- Distance -->
+  <div class="telemetry-card">
+    <div class="tel-label">Est. distance</div>
+    <div class="tel-value" id="tel-distance">—</div>
+    <div class="tel-sub">approximate</div>
+  </div>
+
+</div>
+
+<p class="tel-note">Stats reset on server restart. Distance is estimated (no wheel encoders). Battery voltage display requires an ADC module.</p>

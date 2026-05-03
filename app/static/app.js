@@ -27,6 +27,51 @@ function notify(message, type) {
   setTimeout(function() { if (el.parentElement) el.remove(); }, 5000);
 }
 
+// ── Stream reconnect ───────────────────────────────────────────
+var _streamRetry = {};
+
+function onStreamError(id) {
+  var overlay = document.getElementById(id + '-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  if (_streamRetry[id]) return;
+  _streamRetry[id] = setTimeout(function() {
+    _streamRetry[id] = null;
+    var el = document.getElementById(id);
+    if (el) {
+      var base = el.getAttribute('data-src') || el.src.split('?')[0];
+      el.setAttribute('data-src', base);
+      el.src = base + '?t=' + Date.now();
+    }
+  }, 3000);
+}
+
+function onStreamLoad(id) {
+  var overlay = document.getElementById(id + '-overlay');
+  if (overlay) overlay.style.display = 'none';
+  clearTimeout(_streamRetry[id]);
+  _streamRetry[id] = null;
+}
+
+function reconnectStreams() {
+  ['cam-stream', 'pip-cam'].forEach(function(id) {
+    clearTimeout(_streamRetry[id]);
+    _streamRetry[id] = null;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'IMG') {
+      var base = el.getAttribute('data-src') || el.src.split('?')[0];
+      el.setAttribute('data-src', base);
+      el.src = base + '?t=' + Date.now();
+    }
+  });
+}
+
+function reconnectAll() {
+  _statusDisconnected = false;
+  var btn = document.getElementById('reconnect-btn');
+  if (btn) btn.style.display = 'none';
+  reconnectStreams();
+}
+
 // ── Status polling ─────────────────────────────────────────────
 var _statusDisconnected = false;
 
@@ -34,10 +79,8 @@ function pollStatus() {
   fetch('/api/status')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (_statusDisconnected) {
-        location.reload();
-        return;
-      }
+      var wasDisconnected = _statusDisconnected;
+      _statusDisconnected = false;
       var dot = document.getElementById('status-dot');
       var msg = document.getElementById('status-msg');
       var servoDot = document.getElementById('servo-dot');
@@ -47,6 +90,9 @@ function pollStatus() {
       if (servoDot) {
         servoDot.className = data.servo_ok ? 'status-dot ok' : 'status-dot';
         servoDot.title = data.servo_ok ? 'Servo: connected' : 'Servo: not connected';
+      }
+      if (wasDisconnected) {
+        reconnectAll();
       }
     })
     .catch(function() {

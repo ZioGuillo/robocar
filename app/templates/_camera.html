@@ -10,6 +10,8 @@
   <div id="cam-stream-overlay" class="stream-overlay" style="display:none">
     <button onclick="reconnectStreams()" class="stream-reconnect-btn" title="Reconnect camera">↺</button>
   </div>
+  <button id="cam-stream-corner" class="stream-corner-btn"
+          onclick="reconnectStreams()" title="Refresh stream">↺</button>
   {% elif camera_stream_url %}
   <iframe src="{{ camera_stream_url }}" scrolling="no" title="Camera stream"></iframe>
   {% else %}

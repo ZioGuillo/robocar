@@ -16,3 +16,4 @@ RPi.GPIO>=0.7.1
 #   sudo apt install python3-tflite-runtime  (if available in apt)
 # Without it, ml_driver.available = False and detection is silently disabled.
 Pillow>=10.0.0
+psutil>=5.9.0

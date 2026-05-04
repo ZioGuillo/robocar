@@ -55,6 +55,13 @@ def _annotate(frame: bytes, detections: list[dict]) -> bytes:
     return buf.getvalue()
 
 
+@router.get("/health")
+async def camera_health():
+    """Return current frame counter so the client can detect a frozen stream."""
+    _, counter = camera_driver.get_frame_if_new(-1)
+    return {"available": camera_driver.available, "counter": counter}
+
+
 @router.get("/stream")
 async def mjpeg_stream():
     if not camera_driver.available:

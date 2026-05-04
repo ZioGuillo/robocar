@@ -15,6 +15,29 @@ _state = {
 # Rough conversion: RRB3 motors at full speed ≈ 30 cm/s
 _CM_PER_SPEED_SECOND = 30.0
 
+try:
+    import psutil as _psutil
+    # Prime the CPU counter so the first real call returns a valid delta
+    _psutil.cpu_percent(interval=None)
+    _psutil_ok = True
+except Exception:
+    _psutil_ok = False
+
+
+def _sys_stats() -> dict:
+    """Return cpu_percent and memory info. Returns nulls when psutil is unavailable."""
+    if not _psutil_ok:
+        return {"cpu_percent": None, "ram_used_mb": None,
+                "ram_total_mb": None, "ram_percent": None}
+    cpu = round(_psutil.cpu_percent(interval=None), 1)
+    mem = _psutil.virtual_memory()
+    return {
+        "cpu_percent": cpu,
+        "ram_used_mb": round(mem.used / 1024 / 1024),
+        "ram_total_mb": round(mem.total / 1024 / 1024),
+        "ram_percent": round(mem.percent, 1),
+    }
+
 
 def record_command(latency_ms: float, action: str, speed: float) -> None:
     _state["commands_sent"] += 1
@@ -33,7 +56,7 @@ def record_obstacle(dist_cm: float) -> None:
 def snapshot() -> dict:
     uptime = time.monotonic() - _start
     dist_m = (_state["_motor_speed_seconds"] * _CM_PER_SPEED_SECOND) / 100.0
-    return {
+    data = {
         "uptime_seconds": int(uptime),
         "commands_sent": _state["commands_sent"],
         "obstacles_detected": _state["obstacles_detected"],
@@ -41,3 +64,5 @@ def snapshot() -> dict:
         "last_command_ms": _state["last_command_ms"],
         "estimated_distance_m": round(dist_m, 2),
     }
+    data.update(_sys_stats())
+    return data

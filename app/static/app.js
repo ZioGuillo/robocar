@@ -29,10 +29,18 @@ function notify(message, type) {
 
 // ── Stream reconnect ───────────────────────────────────────────
 var _streamRetry = {};
+var _streamDead = {};   // tracks ids showing the dead overlay
+
+function _setStreamDead(id, dead) {
+  _streamDead[id] = dead;
+  var overlay = document.getElementById(id + '-overlay');
+  var corner  = document.getElementById(id + '-corner');
+  if (overlay) overlay.style.display = dead ? 'flex' : 'none';
+  if (corner)  corner.classList.toggle('spinning', dead);
+}
 
 function onStreamError(id) {
-  var overlay = document.getElementById(id + '-overlay');
-  if (overlay) overlay.style.display = 'flex';
+  _setStreamDead(id, true);
   if (_streamRetry[id]) return;
   _streamRetry[id] = setTimeout(function() {
     _streamRetry[id] = null;
@@ -46,8 +54,7 @@ function onStreamError(id) {
 }
 
 function onStreamLoad(id) {
-  var overlay = document.getElementById(id + '-overlay');
-  if (overlay) overlay.style.display = 'none';
+  _setStreamDead(id, false);
   clearTimeout(_streamRetry[id]);
   _streamRetry[id] = null;
 }
@@ -58,6 +65,8 @@ function reconnectStreams() {
     _streamRetry[id] = null;
     var el = document.getElementById(id);
     if (el && el.tagName === 'IMG') {
+      var corner = document.getElementById(id + '-corner');
+      if (corner) corner.classList.add('spinning');
       var base = el.getAttribute('data-src') || el.src.split('?')[0];
       el.setAttribute('data-src', base);
       el.src = base + '?t=' + Date.now();
@@ -71,6 +80,36 @@ function reconnectAll() {
   if (btn) btn.style.display = 'none';
   reconnectStreams();
 }
+
+// ── Camera heartbeat — detect frozen/dead MJPEG streams ────────
+// onerror is unreliable for <img> MJPEG; instead we poll /api/camera/health
+// which returns the current frame counter. No change in N seconds = dead stream.
+var _camLastCounter = -1;
+var _camDeadTicks   = 0;
+var CAM_DEAD_TICKS  = 3;   // 3 missed polls (~9 s) before showing overlay
+
+function _pollCameraHealth() {
+  fetch('/api/camera/health')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d) return;
+      if (d.counter === _camLastCounter) {
+        _camDeadTicks++;
+        if (_camDeadTicks >= CAM_DEAD_TICKS) {
+          _setStreamDead('cam-stream', true);
+          _setStreamDead('pip-cam',    true);
+        }
+      } else {
+        _camLastCounter = d.counter;
+        _camDeadTicks   = 0;
+        _setStreamDead('cam-stream', false);
+        _setStreamDead('pip-cam',    false);
+      }
+    })
+    .catch(function() {});
+}
+
+setInterval(_pollCameraHealth, 3000);
 
 // ── Status polling ─────────────────────────────────────────────
 var _statusDisconnected = false;
@@ -243,10 +282,32 @@ function batteryLabel(ok) {
     : '<span class="tel-latency-dot" style="background:#e53935"></span>Not detected';
 }
 
+function _barColor(pct) {
+  return pct < 60 ? '#2dc653' : pct < 85 ? '#f9a825' : '#e53935';
+}
+
 function pollTelemetry() {
   fetch('/api/telemetry')
     .then(function(r) { return r.json(); })
     .then(function(d) {
+      // CPU
+      var cpuEl  = document.getElementById('tel-cpu');
+      var cpuBar = document.getElementById('tel-cpu-bar');
+      if (cpuEl && d.cpu_percent !== null && d.cpu_percent !== undefined) {
+        cpuEl.textContent = d.cpu_percent + '%';
+        cpuBar.style.width = d.cpu_percent + '%';
+        cpuBar.style.background = _barColor(d.cpu_percent);
+      }
+
+      // RAM
+      var ramEl  = document.getElementById('tel-ram');
+      var ramBar = document.getElementById('tel-ram-bar');
+      if (ramEl && d.ram_percent !== null && d.ram_percent !== undefined) {
+        ramEl.textContent = d.ram_used_mb + ' / ' + d.ram_total_mb + ' MB';
+        ramBar.style.width = d.ram_percent + '%';
+        ramBar.style.background = _barColor(d.ram_percent);
+      }
+
       // Uptime
       document.getElementById('tel-uptime').textContent = fmtUptime(d.uptime_seconds);
 

@@ -13,7 +13,7 @@ PI_URL      = http://$(shell echo $(PI_HOST) | cut -d@ -f2):8000
 
 SSH         = ssh -i $(SSH_KEY) $(PI_HOST)
 
-.PHONY: help connect deploy restart logs status test open set-password
+.PHONY: help connect deploy restart logs logs-tail status test open set-password
 
 help:          ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -63,11 +63,14 @@ restart:       ## Restart the app on the robot without re-deploying
 	$(SSH) "$(_wait_ready)"
 
 logs:          ## Stream live logs from the robot
-	$(SSH) "tail -f $(PI_DIR)/robocontrol.log"
+	$(SSH) "journalctl -u robocontrol -f"
+
+logs-tail:     ## Show last 50 log lines from the robot
+	$(SSH) "journalctl -u robocontrol -n 50 --no-pager"
 
 status:        ## Check if the app is running on the robot
-	$(SSH) "curl -s http://localhost:8000/api/status && echo && \
-	        pgrep -a python | grep uvicorn || echo '(uvicorn not found)'"
+	$(SSH) "systemctl is-active robocontrol && \
+	        curl -s http://localhost:8000/api/status && echo"
 
 test:          ## Run the test suite locally (no hardware needed)
 	python -m pytest tests/ -v

@@ -49,6 +49,7 @@ Full-size live stream and a **Camera Pan & Tilt** 3×3 grid:
 - Directional buttons nudge the pan/tilt servos.
 - Centre button re-centres both servos.
 - Stream source priority: **built-in CSI/USB camera → `CAMERA_STREAM_URL` → placeholder**.
+- If the stream drops (Wi-Fi hiccup, server restart), a **↺ reconnect overlay** appears and retries automatically every 3 s — no full page reload needed.
 
 ---
 
@@ -88,6 +89,7 @@ Live session statistics (resets on server restart):
 - **User management** — approve or revoke GitHub OAuth users.
 - **GitHub OAuth** — set Client ID and Secret to enable social login.
 - **Change password** — update the admin account password.
+- **Computer Vision** — enable ML object detection (MobileNet SSD v1, 80 COCO classes). Requires `tflite-runtime` or `ai-edge-litert` and the model file at `data/models/mobilenet_ssd_v1.tflite`. The settings panel shows the exact reason when unavailable (library missing vs. model file not found).
 
 ---
 
@@ -152,10 +154,12 @@ The app auto-detects the camera on startup — no `.env` change needed:
 | Camera type | How to connect | Extra setup |
 | ----------- | -------------- | ----------- |
 | **Pi Camera Module (CSI)** | Ribbon cable into the CSI port | `sudo apt install -y python3-picamera2` |
-| **USB webcam** | Plug into any USB port | None — works out of the box |
+| **USB webcam** | Plug into any USB port | `sudo apt install -y python3-picamera2` |
 | **External MJPEG stream** | Any IP camera / `mjpg-streamer` | Set `CAMERA_STREAM_URL=http://...` in `.env` |
 
-Detection order: **CSI (`picamera2`) → USB (`opencv`) → `CAMERA_STREAM_URL` → placeholder**.
+Detection order: **CSI/USB via `picamera2` → `CAMERA_STREAM_URL` → placeholder**.
+
+Both CSI and USB cameras are handled by `picamera2` via the libcamera UVC pipeline. The camera captures raw MJPEG frames directly from the hardware encoder and passes them to the stream without decode/re-encode — keeping latency minimal even on low-power hardware like the Pi Zero.
 
 ### Enabling the Pi Camera Module (CSI)
 
@@ -267,7 +271,8 @@ Each logged-in user can click their avatar in the top bar to choose a personal i
 make help         # list all commands
 make deploy       # push latest commits to the robot and restart
 make restart      # restart the app without re-deploying
-make logs         # stream live logs from the robot
+make logs         # stream live logs from the robot (journalctl -f)
+make logs-tail    # show last 50 log lines
 make status       # check if the app is running
 make test         # run the test suite locally
 make open         # open the robot web UI in your browser
@@ -378,7 +383,7 @@ app/routes/
 | ------ | -------- |
 | `from app.hardware import rrb3_driver` | `set_motors()`, `get_distance()`, `available` |
 | `from app.hardware import servo_driver` | `move()`, `center()`, `available` |
-| `from app.hardware import camera_driver` | `get_frame()`, `start()`, `stop()`, `available`, `_backend` |
+| `from app.hardware import camera_driver` | `get_frame()`, `get_frame_if_new(counter)`, `start()`, `stop()`, `available`, `_backend` |
 | `from app.config import settings` | all `.env` values |
 | `from app import telemetry` | `record_command()` |
 

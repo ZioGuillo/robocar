@@ -1,3 +1,4 @@
+import threading
 import time
 
 _start = time.monotonic()
@@ -15,28 +16,41 @@ _state = {
 # Rough conversion: RRB3 motors at full speed ≈ 30 cm/s
 _CM_PER_SPEED_SECOND = 30.0
 
+# ── System stats (sampled in background every 5 s) ──────────────
+_sys = {"cpu_percent": None, "ram_used_mb": None,
+        "ram_total_mb": None, "ram_percent": None}
+
 try:
     import psutil as _psutil
-    # Prime the CPU counter so the first real call returns a valid delta
-    _psutil.cpu_percent(interval=None)
     _psutil_ok = True
 except Exception:
     _psutil_ok = False
 
 
+def _sample_loop() -> None:
+    # First call primes the counter; subsequent calls return the delta.
+    if _psutil_ok:
+        _psutil.cpu_percent(interval=None)
+    while True:
+        time.sleep(5)
+        if not _psutil_ok:
+            continue
+        try:
+            cpu = round(_psutil.cpu_percent(interval=None), 1)
+            mem = _psutil.virtual_memory()
+            _sys["cpu_percent"]  = cpu
+            _sys["ram_used_mb"]  = round(mem.used  / 1024 / 1024)
+            _sys["ram_total_mb"] = round(mem.total / 1024 / 1024)
+            _sys["ram_percent"]  = round(mem.percent, 1)
+        except Exception:
+            pass
+
+
+threading.Thread(target=_sample_loop, daemon=True).start()
+
+
 def _sys_stats() -> dict:
-    """Return cpu_percent and memory info. Returns nulls when psutil is unavailable."""
-    if not _psutil_ok:
-        return {"cpu_percent": None, "ram_used_mb": None,
-                "ram_total_mb": None, "ram_percent": None}
-    cpu = round(_psutil.cpu_percent(interval=None), 1)
-    mem = _psutil.virtual_memory()
-    return {
-        "cpu_percent": cpu,
-        "ram_used_mb": round(mem.used / 1024 / 1024),
-        "ram_total_mb": round(mem.total / 1024 / 1024),
-        "ram_percent": round(mem.percent, 1),
-    }
+    return dict(_sys)
 
 
 def record_command(latency_ms: float, action: str, speed: float) -> None:

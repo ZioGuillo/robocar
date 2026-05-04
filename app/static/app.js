@@ -293,19 +293,17 @@ function pollTelemetry() {
       // CPU
       var cpuEl  = document.getElementById('tel-cpu');
       var cpuBar = document.getElementById('tel-cpu-bar');
-      if (cpuEl && d.cpu_percent !== null && d.cpu_percent !== undefined) {
+      if (cpuEl && d.cpu_percent != null) {
         cpuEl.textContent = d.cpu_percent + '%';
-        cpuBar.style.width = d.cpu_percent + '%';
-        cpuBar.style.background = _barColor(d.cpu_percent);
+        if (cpuBar) { cpuBar.style.width = d.cpu_percent + '%'; cpuBar.style.background = _barColor(d.cpu_percent); }
       }
 
       // RAM
       var ramEl  = document.getElementById('tel-ram');
       var ramBar = document.getElementById('tel-ram-bar');
-      if (ramEl && d.ram_percent !== null && d.ram_percent !== undefined) {
+      if (ramEl && d.ram_percent != null) {
         ramEl.textContent = d.ram_used_mb + ' / ' + d.ram_total_mb + ' MB';
-        ramBar.style.width = d.ram_percent + '%';
-        ramBar.style.background = _barColor(d.ram_percent);
+        if (ramBar) { ramBar.style.width = d.ram_percent + '%'; ramBar.style.background = _barColor(d.ram_percent); }
       }
 
       // Uptime

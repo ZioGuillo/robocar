@@ -76,13 +76,18 @@ def init_db() -> None:
         if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'admin', ?)",
+                "INSERT INTO users (username, password_hash, role, must_change_password, created_at) "
+                "VALUES (?, ?, 'admin', 1, ?)",
                 ("admin", hash_password(_ADMIN_DEFAULT_PASSWORD), now),
             )
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN user_icon TEXT DEFAULT 'astronaut'")
-        except sqlite3.OperationalError:
-            pass
+        for col, definition in [
+            ("user_icon", "TEXT DEFAULT 'astronaut'"),
+            ("must_change_password", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            except sqlite3.OperationalError:
+                pass
         for key, default in [
             ("github_oauth_enabled", "false"),
             ("github_client_id", ""),
@@ -154,6 +159,16 @@ def set_user_icon(user_id: int, icon: str) -> None:
 def update_admin_password(new_hash: str) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE users SET password_hash = ? WHERE username = 'admin'", (new_hash,))
+
+
+def update_user_password(user_id: int, new_hash: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+
+
+def clear_must_change_password(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET must_change_password = 0 WHERE id = ?", (user_id,))
 
 
 # ── Session helpers ───────────────────────────────────────────────────────────

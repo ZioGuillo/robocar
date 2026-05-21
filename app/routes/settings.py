@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from app import db
 from app.hardware import camera_driver, ml_driver
@@ -71,6 +71,24 @@ async def save_icon(request: Request, icon: str = Form(...)):
         db.set_user_icon(user["id"], icon)
     except ValueError:
         pass
+    return RedirectResponse("/", status_code=302)
+
+
+@router.post("/first-password")
+async def first_password(
+    request: Request,
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    user = request.state.user
+    if not user["must_change_password"]:
+        return Response("Forbidden", status_code=403)
+    if new_password != confirm_password:
+        return RedirectResponse("/?pwd_error=mismatch", status_code=302)
+    if len(new_password) < 8:
+        return RedirectResponse("/?pwd_error=too_short", status_code=302)
+    db.update_user_password(user["id"], db.hash_password(new_password))
+    db.clear_must_change_password(user["id"])
     return RedirectResponse("/", status_code=302)
 
 

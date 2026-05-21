@@ -355,6 +355,29 @@
       background: #2dc653;
       transition: width 0.4s ease, background 0.4s ease;
     }
+
+    /* ── Forced password change modal ── */
+    .pwd-modal-backdrop {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pwd-modal-card {
+      width: min(420px, 92vw);
+      background: var(--pico-card-background-color);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 16px; padding: 2rem 1.75rem;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+    .pwd-modal-card h2 { margin-bottom: 0.4rem; font-size: 1.25rem; }
+    .pwd-modal-card p.hint {
+      color: var(--pico-muted-color); font-size: 0.88rem; margin-bottom: 1.2rem;
+    }
+    .pwd-modal-card .pwd-error {
+      color: #ef9a9a; font-size: 0.85rem;
+      background: rgba(229,57,53,0.12); border: 1px solid rgba(229,57,53,0.25);
+      border-radius: 8px; padding: 0.45rem 0.75rem; margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -463,5 +486,29 @@
     }
   })();
 </script>
+{% if user and user.must_change_password %}
+<div class="pwd-modal-backdrop">
+  <div class="pwd-modal-card">
+    <h2>Set your password</h2>
+    <p class="hint">You're using the default password. Set a new one to continue.</p>
+    {% if request.query_params.get('pwd_error') == 'mismatch' %}
+    <p class="pwd-error">Passwords do not match.</p>
+    {% elif request.query_params.get('pwd_error') == 'too_short' %}
+    <p class="pwd-error">Password must be at least 8 characters.</p>
+    {% endif %}
+    <form method="post" action="/settings/first-password">
+      <label>
+        New password
+        <input type="password" name="new_password" required minlength="8" autofocus>
+      </label>
+      <label>
+        Confirm password
+        <input type="password" name="confirm_password" required minlength="8">
+      </label>
+      <button type="submit">Set password</button>
+    </form>
+  </div>
+</div>
+{% endif %}
 </body>
 </html>

@@ -8,6 +8,13 @@
 ![Hardware](https://img.shields.io/badge/hardware-RRB3-orange?style=flat)
 ![Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat&logo=cloudflare&logoColor=white)
 
+![NASA NPR 2810.1](https://img.shields.io/badge/NASA%20NPR%202810.1-IT%20Security%20Policy-0B3D91?style=flat&logo=nasa&logoColor=white)
+![JPL ICPS](https://img.shields.io/badge/JPL%20ICPS-Engineering%20Standards-C1440E?style=flat&logo=nasa&logoColor=white)
+![Mars Rover Style](https://img.shields.io/badge/Mars%20Rover-Inspired%20Design-B7410E?style=flat&logo=nasa&logoColor=white)
+![NIST SP 800-53](https://img.shields.io/badge/NIST%20SP%20800--53-Rev%205%20Controls-003087?style=flat&logoColor=white)
+![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-Hardened-4A154B?style=flat&logoColor=white)
+![Security Audit](https://img.shields.io/badge/Security%20Audit-May%202026-2DC653?style=flat&logoColor=white)
+
 Control a Raspberry Pi robot car from any browser — no app, no cables, no soldering beyond the motor board.
 
 ---
@@ -30,7 +37,8 @@ Control a Raspberry Pi robot car from any browser — no app, no cables, no sold
 6. [Day-to-day Commands](#6-day-to-day-commands)
 7. [Configuration Reference](#7-configuration-reference)
 8. [API Reference](#8-api-reference)
-9. [Developer Guide](#9-developer-guide)
+9. [Security](#9-security)
+10. [Developer Guide](#10-developer-guide)
 
 ---
 
@@ -422,7 +430,31 @@ Motor commands accept an optional body: `{"speed": 0.75}` (0.0–1.0).
 
 ---
 
-## 9. Developer Guide
+## 9. Security
+
+RoboControl's security model is inspired by the frameworks used at **NASA Jet Propulsion Laboratory (JPL)** for mission-critical systems — the same principles that govern the software controlling the Perseverance rover on Mars.
+
+| Standard | What it covers | Applied in RoboControl |
+| -------- | -------------- | ---------------------- |
+| **NASA NPR 2810.1** | IT Security policy for all NASA systems | Auth, session management, config hygiene |
+| **JPL ICPS** | Institutional Computing Protection Standard — least privilege, strong auth, encryption in transit | RBAC roles, HTTPS via Cloudflare TLS, bcrypt passwords |
+| **NIST SP 800-53 Rev 5** | Federal security controls (AC · IA · AU · SC · SI · CM) | Rate limiting, audit logging, input validation, secrets in `.env` |
+| **OWASP Top 10** | Web application vulnerability baseline | Parameterized SQL, no path traversal, session cookie flags |
+
+Controls implemented:
+
+- **AC — Access Control** — session tokens signed with `itsdangerous`, roles: `admin / approved / pending / revoked`
+- **IA — Authentication** — bcrypt password hashing, GitHub OAuth 2.0, 14-day token expiry, forced first-login password change
+- **AU — Audit** — all HTTP requests logged by uvicorn; obstacles, commands and telemetry stored in SQLite
+- **SC — System Protection** — HTTPS via Cloudflare Tunnel, rate limiting on login (5 req/s) and motor commands (configurable)
+- **SI — Input Integrity** — Pydantic validation on all API inputs, parameterized SQL throughout `app/db.py`
+- **CM — Config Management** — secrets in `.env` (never in source), systemd service isolation
+
+> "Same mission, different budget." — Perseverance cost $2.75 billion and has a dedicated security team. RoboControl costs ~$100 and is maintained by one person. The security principles are the same.
+
+---
+
+## 10. Developer Guide
 
 ### Enabling the Pi Camera (CSI)
 

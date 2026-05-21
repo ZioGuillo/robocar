@@ -99,12 +99,12 @@ async def change_password(
     new_password: str = Form(...),
     confirm_password: str = Form(...),
 ):
-    admin = db.get_user_by_username("admin")
-    if not admin or not db.verify_password(current_password, admin["password_hash"]):
+    user = request.state.user
+    if not db.verify_password(current_password, user["password_hash"] or ""):
         return RedirectResponse("/?tab=settings&error=wrong_password", status_code=302)
     if new_password != confirm_password:
         return RedirectResponse("/?tab=settings&error=password_mismatch", status_code=302)
     if len(new_password) < 8:
         return RedirectResponse("/?tab=settings&error=password_too_short", status_code=302)
-    db.update_admin_password(db.hash_password(new_password))
+    db.update_user_password(user["id"], db.hash_password(new_password))
     return RedirectResponse("/?tab=settings&saved=password", status_code=302)

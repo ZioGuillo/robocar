@@ -50,7 +50,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key, https_only=False)
+_https_only = settings.base_url.startswith("https://") if settings.base_url else False
+app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key, https_only=_https_only)
 
 _PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/api/ping"}
 _signer = itsdangerous.TimestampSigner(settings.session_secret_key)
@@ -75,6 +76,15 @@ async def auth_guard(request: Request, call_next):
 
     if path.startswith("/static") or path in _PUBLIC_PATHS:
         return await call_next(request)
+
+    # Brute-force protection on login
+    if path == "/login" and request.method == "POST":
+        client_ip = request.client.host if request.client else "unknown"
+        if not rate_limiter.is_allowed(f"login:{client_ip}", 5):  # 5 attempts/second
+            return JSONResponse(
+                {"ok": False, "message": "Too many login attempts — please wait"},
+                status_code=429,
+            )
 
     token = _get_session_token(request)
     user = db.get_session_user(token) if token else None

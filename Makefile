@@ -28,7 +28,7 @@ _wait_ready = for i in 1 2 3 4 5 6 7 8 9 10; do \
 deploy:        ## Push latest git commits to the robot and restart the service
 	@echo "=== Deploying to $(PI_HOST) ==="
 	git push origin master
-	$(SSH) "cd $(PI_DIR) && git pull && venv/bin/pip install -r requirements.txt -q"
+	$(SSH) "cd $(PI_DIR) && git fetch origin && git reset --hard origin/master && venv/bin/pip install -r requirements.txt -q"
 	$(SSH) "cd $(PI_DIR) && mkdir -p data/models && \
 	  if [ ! -f data/models/mobilenet_ssd_v1.tflite ]; then \
 	    echo 'Downloading ML model...' && \

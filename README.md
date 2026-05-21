@@ -153,7 +153,7 @@ Default credentials:
 
 | Username | Password |
 | -------- | -------- |
-| `admin` | `admin` |
+| `admin` | `Yourpassword` |
 
 **Change the password immediately** — go to the **Settings tab → Change password**.
 

@@ -11,8 +11,8 @@
 *.crt
 *.key
 .superpowers/
-docs/superpowers/plans/
-docs/superpowers/specs/
+docs/
+presentation/
 .claude/
 
 # Packages #

@@ -1,433 +1,513 @@
 # RoboControl
 
-Web-based controller for a Raspberry Pi robot car built on the RaspiRobot Board V3 (RRB3).
-
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=flat&logo=fastapi&logoColor=white)
 ![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-3B%2B%2F4-C51A4A?style=flat&logo=raspberrypi&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 ![Hardware](https://img.shields.io/badge/hardware-RRB3-orange?style=flat)
+![Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat&logo=cloudflare&logoColor=white)
+
+Control a Raspberry Pi robot car from any browser — no app, no cables, no soldering beyond the motor board.
 
 ---
 
 ## Gallery
 
-| Front view | Top view | Angle view |
+| Front | Top | Angle |
 | :---: | :---: | :---: |
 | ![Front](images/IMG_5125.JPG) | ![Top](images/IMG_5126.JPG) | ![Angle](images/IMG_5127.JPG) |
 
 ---
 
-## Web UI
+## Table of Contents
 
-The control panel is a mobile-friendly dark-themed web app accessible at `http://<pi-ip>:8000`.
-
-### Login
-
-The login page shows a **robot status dot** (green = online, red = unreachable) before you even sign in. You can log in with your admin credentials or — if GitHub OAuth is configured — with the **Login with GitHub** button.
-
-### Drive
-
-![Drive tab](images/IMG_dash.png)
-
-The main control screen. From top to bottom:
-
-- **Camera preview** — live MJPEG stream inline while you drive (CSI or USB camera, auto-detected).
-- **D-pad** — five-button directional controller. Top = forward, bottom = reverse, left/right turn, red centre = stop.
-- **Speed slider** — sets motor power 0–100% (default 75%). Sent with every motor command.
-- **Auto-Drive toggle** — reserved for upcoming autonomous navigation; currently labelled *"Not available yet"*.
+1. [What You Need](#1-what-you-need)
+2. [Install](#2-install)
+3. [First Login](#3-first-login)
+4. [Using the Controller](#4-using-the-controller)
+5. [Internet Access — Optional](#5-internet-access--optional)
+6. [Day-to-day Commands](#6-day-to-day-commands)
+7. [Configuration Reference](#7-configuration-reference)
+8. [API Reference](#8-api-reference)
+9. [Developer Guide](#9-developer-guide)
 
 ---
 
-### Camera
+## 1. What You Need
 
-![Camera tab](images/IMG_camera.png)
+### Required
 
-Full-size live stream and a **Camera Pan & Tilt** 3×3 grid:
+| Part | Details |
+| ---- | ------- |
+| Raspberry Pi 3B+ or 4 | Any RAM size |
+| RaspiRobot Board V3 (RRB3) | Motor driver HAT — plugs directly onto the GPIO header |
+| HC-SR04 ultrasonic sensor | Plugs into the RRB3 sonar header |
+| 2× DC gear motors + chassis | Any TT-motor compatible pair |
+| 7.4V LiPo battery (2S) | Powers the motors via the RRB3 |
+| MicroSD card (16 GB+) | For Raspberry Pi OS |
 
-- Directional buttons nudge the pan/tilt servos.
-- Centre button re-centres both servos.
-- Stream source priority: **built-in CSI/USB camera → `CAMERA_STREAM_URL` → placeholder**.
-- If the stream drops (Wi-Fi hiccup, server restart), a **↺ reconnect overlay** appears and retries automatically every 3 s — no full page reload needed.
+### Optional
 
----
+| Part | What it adds |
+| ---- | ------------ |
+| Pi Camera Module (CSI) or USB webcam | Live video stream while driving |
+| 2× SG90 servos + pan/tilt bracket | Aim the camera remotely |
+| Passive buzzer | Audio alerts on obstacles |
 
-### Missions
-
-![Missions tab](images/IMG_missions.png)
-
-Autonomous mission modes — all currently *"Coming soon"*:
-
-| Mission | Description |
-| ------- | ----------- |
-| **Path Following** | Define a sequence of waypoints; the car executes the route autonomously. |
-| **Visual Search** | Upload a target image; the car roams until the camera recognises it, then beeps and alerts you. |
-| **Auto-Drive** | Fully autonomous free-roam using the sonar sensor to avoid obstacles. |
-
----
-
-### Telemetry
-
-![Telemetry tab](images/IMG_telemetry.png)
-
-Live session statistics (resets on server restart):
-
-| Metric | Description |
-| ------ | ----------- |
-| **Battery** | Voltage from the RRB3 ADC. |
-| **Uptime** | Time elapsed since the server process started. |
-| **Last CMD Latency** | Round-trip time of the most recent motor command. |
-| **Commands Sent** | Total motor commands issued in this session. |
-| **Obstacles Hit** | Times the sonar triggered an automatic stop. |
-| **Est. Distance** | Approximate distance travelled, calculated from command duration. |
-
----
-
-### Settings *(admin only)*
-
-- **User management** — approve or revoke GitHub OAuth users.
-- **GitHub OAuth** — set Client ID and Secret to enable social login.
-- **Change password** — update the admin account password.
-- **Computer Vision** — enable ML object detection (MobileNet SSD v1, 80 COCO classes). Requires `tflite-runtime` or `ai-edge-litert` and the model file at `data/models/mobilenet_ssd_v1.tflite`. The settings panel shows the exact reason when unavailable (library missing vs. model file not found).
-
----
-
-## Hardware
-
-| Component | Details |
-| ----------- | --------- |
-| Raspberry Pi | 3B+ or later |
-| Motor HAT | RaspiRobot Board V3 (RRB3) — dual DC motor driver |
-| Distance sensor | HC-SR04 ultrasonic, mounted on the RRB3 sonar header |
-| Camera | CSI Pi Camera Module **or** any USB webcam (auto-detected) |
-| Servos (optional) | Pan/tilt camera mount, controlled via GPIO PWM |
-
----
-
-## Bill of Materials
-
-| # | Component | Notes |
-| --- | ----------- | ------- |
-| 1 | **Raspberry Pi 3B+ or 4** | Any model with 40-pin GPIO header |
-| 2 | **RaspiRobot Board V3 (RRB3)** | Motor driver HAT, plugs directly onto GPIO header |
-| 3 | **HC-SR04 Ultrasonic Sensor** | Plugs into the RRB3 sonar header |
-| 4 | **2× DC Gear Motors with rubber wheels** | Any TT-motor compatible pair, ~3–6V |
-| 5 | **2-wheel differential drive chassis** | Acrylic or 3D-printed frame |
-| 6 | **LiPo battery pack** | 7.4V 2S LiPo; the RRB3 accepts 6–12V |
-| 7 | **LiPo balance charger** | e.g. IMAX B6 or similar 2S charger |
-| 8 | **Micro-USB cable** | Power to the Pi |
-| 9 | **Dupont jumper wires** | For HC-SR04 and optional servo connections |
-| 10 | **MicroSD card (16 GB+)** | For Raspberry Pi OS |
-| 11 | **Pan/tilt servo bracket** *(optional)* | Any SG90-compatible 2-axis kit |
-| 12 | **2× SG90 micro servos** *(optional)* | For camera pan/tilt mount |
-| 13 | **USB webcam** *(optional)* | Logitech C270 / C920 or any UVC-compatible webcam |
-| 14 | **Pi Camera Module** *(optional)* | CSI ribbon cable camera (1080P IR or standard) — alternative to USB |
-| 15 | **Buzzer (passive/active)** *(optional)* | 5V, connects to GPIO 18 by default |
-
-### Wiring overview
+### Wiring at a glance
 
 ```text
 Raspberry Pi GPIO header
         │
-  RaspiRobot Board V3 (RRB3)
-  ├── Left motor terminals  → Motor A
-  ├── Right motor terminals → Motor B
-  ├── Sonar header (5V / Trig / Echo / GND) → HC-SR04
-  └── Power input (7.4V LiPo)
+  RaspiRobot Board V3
+  ├── Motor A terminals  → Left motor
+  ├── Motor B terminals  → Right motor
+  ├── Sonar header       → HC-SR04
+  └── Power input        → 7.4V LiPo
 
-GPIO 12 (PWM) → Pan servo signal
-GPIO 13 (PWM) → Tilt servo signal
-GPIO 18       → Buzzer
-CSI port      → Pi Camera Module ribbon cable  (option A)
-USB port      → USB webcam                     (option B)
+GPIO 12 → Pan servo
+GPIO 13 → Tilt servo
+GPIO 18 → Buzzer
+CSI     → Pi Camera ribbon   (if using)
+USB     → USB webcam         (if using)
 ```
 
-> **Power tip:** The RRB3 powers the motors from the LiPo. Power the Pi separately via its micro-USB port to avoid motor noise causing reboots.
+> Power the Pi from its own micro-USB supply. Sharing power with the motors causes reboots.
 
 ---
 
-## Camera Setup
+## 2. Install
 
-The app auto-detects the camera on startup — no `.env` change needed:
+### Step 1 — Flash the SD card
 
-| Camera type | How to connect | Extra setup |
-| ----------- | -------------- | ----------- |
-| **Pi Camera Module (CSI)** | Ribbon cable into the CSI port | `sudo apt install -y python3-picamera2` |
-| **USB webcam** | Plug into any USB port | `sudo apt install -y python3-picamera2` |
-| **External MJPEG stream** | Any IP camera / `mjpg-streamer` | Set `CAMERA_STREAM_URL=http://...` in `.env` |
+Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and flash **Raspberry Pi OS Lite (64-bit, Bookworm)**. In the imager's advanced settings, enable SSH and set a username/password before writing.
 
-Detection order: **CSI/USB via `picamera2` → `CAMERA_STREAM_URL` → placeholder**.
+### Step 2 — Boot and connect
 
-Both CSI and USB cameras are handled by `picamera2` via the libcamera UVC pipeline. The camera captures raw MJPEG frames directly from the hardware encoder and passes them to the stream without decode/re-encode — keeping latency minimal even on low-power hardware like the Pi Zero.
-
-### Enabling the Pi Camera Module (CSI)
+Insert the card, power on the Pi, and find its IP address from your router's device list. Then open a terminal:
 
 ```bash
-# Install the system package (not available via pip)
-sudo apt install -y python3-picamera2
-
-# Enable the camera interface
-sudo raspi-config nonint do_camera 0
-
-sudo reboot
+ssh pi@<pi-ip-address>
 ```
 
-### USB webcam — no extra steps
-
-Just plug in the webcam and restart the service:
-
-```bash
-sudo systemctl restart robocontrol
-```
-
----
-
-## Setup (first time on the Pi)
-
-SSH into the Pi and clone the repo:
+### Step 3 — Clone the repo
 
 ```bash
 git clone https://github.com/ZioGuillo/robocontrol.git ~/robocontrol
 cd ~/robocontrol
 ```
 
-Edit your config:
+### Step 4 — Create your config file
 
 ```bash
 cp .env.example .env
-nano .env
 ```
 
-At minimum, set `SESSION_SECRET_KEY` — a random 32+ character string:
+Generate a secret key and paste it into `.env`:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Run the install script — creates the venv, installs dependencies, and registers the systemd service:
+Open `.env` with `nano .env` and set:
+
+```ini
+SESSION_SECRET_KEY=<paste the key here>
+```
+
+Save and close (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+### Step 5 — Run the install script
 
 ```bash
 bash scripts/install.sh
 ```
 
-The web UI is available at `http://<pi-ip>:8000`.
+This will:
 
-### First login & changing the admin password
+- Create the Python virtual environment and install all dependencies
+- Install the camera driver (`picamera2`) if available
+- Register and start the `robocontrol` systemd service (auto-starts on every boot)
 
-Default credentials: **`admin` / `admin`** — change immediately:
+At the end you will see something like:
 
-```bash
-# From your local machine:
-make set-password ADMIN_PASS=MyNewSecurePassword!
+```text
+  Local URL  : http://192.168.x.x:8000
+  Public URL : not configured (local-only mode)
 ```
 
-Or set it as part of the initial deploy:
+### Step 6 — Open the controller
 
-```bash
-make deploy ADMIN_PASS=MyNewSecurePassword!
+On any device connected to the same WiFi, open a browser and go to:
+
+```text
+http://<pi-ip-address>:8000
 ```
 
 ---
 
-## Authentication
+## 3. First Login
 
-RoboControl uses session-based login. There is one built-in admin account; additional users can sign in via **GitHub OAuth**.
+Default credentials:
 
-| Role | Access |
-| ---- | ------ |
-| `admin` | All tabs including Settings |
-| `approved` | Drive, Camera, Missions, Telemetry |
-| `pending` | Sees "Awaiting approval" message |
-| `revoked` | Sees "Access denied" message |
+| Username | Password |
+| -------- | -------- |
+| `admin` | `admin` |
 
-### GitHub OAuth setup
+**Change the password immediately** — go to the **Settings tab → Change password**.
+
+---
+
+## 4. Using the Controller
+
+### Drive tab
+
+![Drive tab](images/IMG_dash.png)
+
+| Control | What it does |
+| ------- | ------------ |
+| Camera preview | Live stream while you drive |
+| D-pad | Forward / reverse / turn left / turn right / stop (red centre) |
+| Speed slider | Motor power 0–100% (default 75%) |
+
+When the sonar detects an obstacle closer than 20 cm, the car stops automatically and the UI shows a warning.
+
+### Camera tab
+
+![Camera tab](images/IMG_camera.png)
+
+Full-size live stream. The 3×3 grid below it nudges the pan/tilt servos; the centre button re-centres both.
+
+Detection order: **CSI camera → USB webcam → `CAMERA_STREAM_URL` → placeholder image**.
+
+### Missions tab
+
+![Missions tab](images/IMG_missions.png)
+
+| Mission | Description |
+| ------- | ----------- |
+| Path Following | Drive a pre-defined waypoint route automatically |
+| Visual Search | Roam until the camera finds a target image, then alert |
+| Auto-Drive | Free-roam with sonar-based obstacle avoidance |
+
+All missions are currently **coming soon**.
+
+### Telemetry tab
+
+![Telemetry tab](images/IMG_telemetry.png)
+
+Live stats for the current session (resets on restart):
+
+| Metric | Description |
+| ------ | ----------- |
+| Battery | Voltage from the RRB3 ADC |
+| Uptime | Time since the server started |
+| Last CMD Latency | Round-trip time of the last motor command |
+| Commands Sent | Total motor commands this session |
+| Obstacles Hit | Times the sonar triggered an automatic stop |
+| Est. Distance | Approximate distance driven |
+
+### Settings tab *(admin only)*
+
+- **User management** — approve or revoke GitHub OAuth users
+- **GitHub OAuth** — paste your GitHub app credentials to enable social login
+- **Change password** — update the admin password
+
+---
+
+## 5. Internet Access — Optional
+
+By default the rover is only reachable on your local network. This section is for when you want to control it **from anywhere in the world** using a permanent public URL like `https://rover01.yourdomain.com`.
+
+> Skip this entirely if local control is enough — the rover works fine without it.
+
+### What you need
+
+- A free [Cloudflare account](https://cloudflare.com)
+- A domain added to that account (works with any registrar)
+
+### How it works
+
+The install script runs `cloudflared_provision.py` which:
+
+1. Reads your Cloudflare credentials
+2. Auto-detects your domain (or you can specify one)
+3. Creates a tunnel and assigns the next free `roverXX` subdomain
+4. Adds the DNS record automatically
+5. Saves everything — the tunnel starts on every boot from then on
+
+### Setup
+
+**On your computer** — create a `cloudflared.env` file:
+
+```ini
+CF_API_TOKEN=your_cloudflare_api_token
+CF_ACCOUNT_ID=your_cloudflare_account_id
+
+# Optional — auto-detected if omitted
+# CF_ZONE_ID=your_zone_id
+# CF_ZONE_NAME=mydomain.com
+```
+
+| Variable | Required | Where to find it |
+| -------- | :------: | ---------------- |
+| `CF_API_TOKEN` | Yes | Dashboard → My Profile → API Tokens → Create Token. Permissions: **Tunnel:Edit + DNS:Edit + Zone:Read** |
+| `CF_ACCOUNT_ID` | Yes | Dashboard → any domain page → right sidebar |
+| `CF_ZONE_ID` | No | Dashboard → your domain → right sidebar. Auto-detected if omitted. |
+| `CF_ZONE_NAME` | No | e.g. `mydomain.com`. Picks a specific domain when your account has more than one. |
+
+**Recommended — encrypt the file before putting it on the SD card:**
+
+```bash
+# On your Mac / Linux machine:
+bash scripts/encrypt_env.sh cloudflared.env
+# → produces cloudflared.env.enc  (safe to share)
+```
+
+Copy `cloudflared.env.enc` to the SD card boot partition (`/boot/firmware/`). Then add the passphrase to `~/robocontrol/.env` on the Pi:
+
+```ini
+CLOUDFLARED_ENV_PASSPHRASE=<the passphrase you chose>
+```
+
+If you prefer plain text (trusted environment only), place `cloudflared.env` directly on the boot partition and skip the passphrase step.
+
+**Run provisioning:**
+
+```bash
+python3 scripts/cloudflared_provision.py
+```
+
+On success:
+
+```text
+============================================================
+  rover01 is LIVE
+============================================================
+
+  Public URL : https://rover01.yourdomain.com
+  Local URL  : http://192.168.x.x:8000
+```
+
+### Rover numbering
+
+The script queries your Cloudflare account for existing `roverXX` tunnels and picks the first free slot. Rover01 already set up? The next one becomes rover02 automatically.
+
+### Adding a second rover on a different WiFi
+
+Place a `wifi.txt` file on the boot partition before the first boot:
+
+```ini
+SSID=NetworkName
+PASSWORD=NetworkPassword
+```
+
+The file is deleted automatically after the first successful connection.
+
+To connect to a different network later, drop a new `wifi.txt` on the boot partition and reboot.
+
+### Service startup order
+
+```text
+wifi-provision             ← connects WiFi from wifi.txt (skipped if absent)
+        ↓
+cloudflared-provision      ← provisions tunnel (skipped if no credentials or already done)
+        ↓
+cloudflared                ← tunnel is live
+        ↓
+robocontrol                ← app is live at :8000 regardless of tunnel
+```
+
+### Checking status
+
+```bash
+journalctl -u wifi-provision -n 20          # WiFi provisioning log
+journalctl -u cloudflared-provision -n 20   # Tunnel provisioning log
+sudo systemctl status cloudflared           # Tunnel runtime status
+journalctl -u robocontrol -f                # App live logs
+```
+
+### Re-provisioning (fresh start)
+
+```bash
+rm ~/.cloudflared/config.yml ~/.cloudflared/rover_id ~/.cloudflared/rover_url
+sudo systemctl restart cloudflared-provision
+```
+
+### GitHub OAuth
+
+To let team members log in with their GitHub accounts:
 
 1. Go to **GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App**
-2. Set **Authorization callback URL** to `http://<pi-ip>:8000/auth/callback`
-   - If the robot is exposed via a Cloudflare tunnel or reverse proxy, use the public URL instead: `https://rover.example.com/auth/callback`
+2. Set the callback URL to `https://rover01.yourdomain.com/auth/callback`
 3. Copy the **Client ID** and generate a **Client Secret**
-4. Log in to RoboControl as admin → **Settings tab** → paste the credentials and enable GitHub OAuth
-5. If using a public domain, set `BASE_URL=https://rover.example.com` in `.env` so OAuth redirect URIs match what GitHub expects
+4. In RoboControl: **Settings tab → GitHub OAuth** — paste and enable
+5. Set `BASE_URL=https://rover01.yourdomain.com` in `.env` so redirects match
 
-New GitHub users land in `pending` state until the admin approves them in the Settings tab.
-
-### User avatar / icon
-
-Each logged-in user can click their avatar in the top bar to choose a personal icon:
-
-| Icon | Name |
-| ---- | ---- |
-| 🧑‍🚀 | Astronaut (default) |
-| 👽 | Alien |
-| 🛸 | UFO |
-| 🐶 | Dog |
+New GitHub users land in `pending` until you approve them in the Settings tab.
 
 ---
 
-## Makefile — day-to-day commands
+## 6. Day-to-day Commands
+
+### On the Pi
 
 ```bash
-make help         # list all commands
-make deploy       # push latest commits to the robot and restart
-make restart      # restart the app without re-deploying
-make logs         # stream live logs from the robot (journalctl -f)
-make logs-tail    # show last 50 log lines
-make status       # check if the app is running
-make test         # run the test suite locally
-make open         # open the robot web UI in your browser
-make set-password ADMIN_PASS=<new>   # change the admin password
-make connect      # open an SSH shell on the robot
-```
-
-Override the robot IP for a single command:
-
-```bash
-make deploy PI_HOST=ec2-user@10.0.0.5
-```
-
-Or set it permanently in `.env`:
-
-```bash
-echo "PI_HOST=ec2-user@10.0.0.5" >> .env
-```
-
----
-
-## Service management (on the Pi)
-
-```bash
-sudo systemctl status robocontrol    # check if running
-sudo systemctl restart robocontrol   # restart
-sudo systemctl stop robocontrol      # stop
+sudo systemctl status robocontrol    # is it running?
+sudo systemctl restart robocontrol   # restart after a config change
 journalctl -u robocontrol -f         # live logs
 journalctl -u robocontrol -n 50      # last 50 lines
 ```
 
+### From your computer (Makefile)
+
+```bash
+make help                            # list all commands
+make deploy                          # push latest code to Pi and restart
+make restart                         # restart without deploying
+make logs                            # stream live logs
+make status                          # check if running
+make open                            # open the web UI in your browser
+make connect                         # SSH into the Pi
+make set-password ADMIN_PASS=NewPass # change admin password
+```
+
+Override the Pi address for one command:
+
+```bash
+make deploy PI_HOST=pi@192.168.1.50
+```
+
 ---
 
-## Configuration
+## 7. Configuration Reference
 
-All settings are read from `.env` (or environment variables):
+All settings live in `~/robocontrol/.env`:
 
 | Variable | Default | Description |
-| ---------- | --------- | ------------- |
+| -------- | ------- | ----------- |
 | `SESSION_SECRET_KEY` | *(required)* | Signs session cookies — 32+ random chars |
 | `PORT` | `8000` | HTTP port |
-| `BASE_URL` | *(empty)* | Public base URL when behind a reverse proxy or Cloudflare tunnel (e.g. `https://rover.example.com`) — required for GitHub OAuth redirect URIs to resolve correctly |
+| `BASE_URL` | *(empty)* | Public URL when behind Cloudflare or a proxy — required for GitHub OAuth |
 | `CAMERA_STREAM_URL` | *(empty)* | Fallback MJPEG URL if no local camera is detected |
-| `MOTOR_SPEED_DEFAULT` | `0.75` | Default motor speed (0.0–1.0) |
-| `OBSTACLE_THRESHOLD_CM` | `20` | Sonar stop-and-turn threshold in centimetres |
+| `MOTOR_SPEED_DEFAULT` | `0.75` | Default motor power (0.0–1.0) |
+| `OBSTACLE_THRESHOLD_CM` | `20` | Sonar distance (cm) that triggers auto-stop |
 | `PAN_SERVO_PIN` | `12` | GPIO pin for pan servo |
 | `TILT_SERVO_PIN` | `13` | GPIO pin for tilt servo |
 | `BUZZER_PIN` | `18` | GPIO pin for buzzer |
 | `MOTOR_RATE_LIMIT` | `20` | Max motor commands/second per IP (0 = unlimited) |
+| `CLOUDFLARED_ENV_PASSPHRASE` | *(empty)* | Decrypts `cloudflared.env.enc` on the boot partition |
+| `CF_API_TOKEN` | *(empty)* | Cloudflare API token — leave blank for local-only |
+| `CF_ACCOUNT_ID` | *(empty)* | Cloudflare Account ID |
+| `CF_ZONE_ID` | *(empty)* | Zone ID — auto-detected if omitted |
+| `CF_ZONE_NAME` | *(empty)* | Domain name — selects a zone when account has multiple |
 
 ---
 
-## API
+## 8. API Reference
 
 | Method | Path | Auth | Description |
-| -------- | ------ | ---- | ------------- |
-| `GET` | `/api/ping` | Public | Liveness check — always returns `{"ok": true}` |
-| `GET` | `/api/status` | Required | Hardware availability (motors, servos) |
-| `GET` | `/api/camera/stream` | Required | Live MJPEG stream (`multipart/x-mixed-replace`) |
-| `POST` | `/api/camera/{action}` | Required | Pan/tilt: `up`, `down`, `left`, `right`, `center` |
-| `POST` | `/api/motors/{action}` | Required | `forward`, `reverse`, `left`, `right`, `stop` |
-| `POST` | `/api/motors/auto` | Required | Not implemented (501) |
-| `POST` | `/api/missions/path` | Required | Not implemented (501) |
-| `POST` | `/api/missions/search` | Required | Not implemented (501) |
+| ------ | ---- | :--: | ----------- |
+| `GET` | `/api/ping` | — | Liveness check — returns `{"ok": true}` |
+| `GET` | `/api/status` | Yes | Hardware availability (motors, camera, servos) |
+| `GET` | `/api/camera/stream` | Yes | Live MJPEG stream |
+| `POST` | `/api/camera/{action}` | Yes | Pan/tilt: `up` `down` `left` `right` `center` |
+| `POST` | `/api/motors/{action}` | Yes | `forward` `reverse` `left` `right` `stop` |
+| `POST` | `/api/motors/auto` | Yes | Not implemented (501) |
+| `POST` | `/api/missions/path` | Yes | Not implemented (501) |
+| `POST` | `/api/missions/search` | Yes | Not implemented (501) |
 
-Motor requests accept an optional JSON body: `{"speed": 0.75}` (0.0–1.0).
-
-### Obstacle avoidance
-
-When `forward` is called and the HC-SR04 reads below `OBSTACLE_THRESHOLD_CM`, the car automatically stops, turns right briefly, then stops again. The response includes `"blocked": true` and the measured distance, which triggers an alert in the UI.
+Motor commands accept an optional body: `{"speed": 0.75}` (0.0–1.0).
 
 ---
 
-## Development
+## 9. Developer Guide
 
-Run tests (no hardware required — GPIO/rrb3 imports degrade gracefully):
+### Enabling the Pi Camera (CSI)
+
+```bash
+sudo apt install -y python3-picamera2
+sudo raspi-config nonint do_camera 0
+sudo reboot
+```
+
+USB webcams work out of the box — just plug in and restart the service.
+
+### Adding a new route
+
+The app uses **route auto-discovery** — drop a new file in `app/routes/` and it's live on restart, no changes to `main.py` needed.
+
+```bash
+cp app/routes/_template.py app/routes/lights.py
+# edit lights.py: set prefix and add endpoints
+sudo systemctl restart robocontrol
+```
+
+```text
+app/routes/
+├── _template.py    ← start here
+├── camera.py
+├── missions.py
+├── motors.py
+├── settings.py
+├── status.py
+└── telemetry.py
+```
+
+### Hardware helpers
+
+```python
+from app.hardware import rrb3_driver    # set_motors(), get_distance(), available
+from app.hardware import servo_driver   # move(), center(), available
+from app.hardware import camera_driver  # get_frame(), start(), stop(), available
+from app.config import settings         # all .env values
+from app import telemetry               # record_command()
+```
+
+### Running tests
+
+No hardware required — drivers degrade gracefully when GPIO/rrb3/picamera2 are unavailable:
 
 ```bash
 pytest -v
 ```
 
-The project uses **graceful hardware degradation**: if `rrb3`, `RPi.GPIO`, `picamera2`, or `opencv` are unavailable, the relevant driver sets `available = False` and all dependent routes return `503` rather than crashing.
+### Swapping hardware
 
----
+Only `app/hardware/` is hardware-specific. Everything else is agnostic.
 
-## Extending the App
+**Alternative boards:**
 
-> The app uses **route auto-discovery** — you never need to touch `main.py` to add a new feature.
+| Board | Change |
+| ----- | ------ |
+| NVIDIA Jetson Nano | Swap `RPi.GPIO` → `Jetson.GPIO` |
+| Orange Pi / Banana Pi | Use `OPi.GPIO` or `wiringOP` |
+| BeagleBone Black | Use `Adafruit_BBIO` |
 
-1. Copy `app/routes/_template.py` to a new file (no leading underscore), e.g. `app/routes/lights.py`.
-2. Set the `prefix` and add your endpoints.
-3. Restart — the new routes are live automatically.
-
-```text
-app/routes/
-├── _template.py       ← copy this to start a new feature
-├── camera.py          ← camera stream + pan/tilt
-├── missions.py        ← stubs with IMPLEMENT comments
-├── motors.py          ← drive commands + auto-drive stub
-├── settings.py        ← user management, GitHub OAuth, password
-├── status.py          ← hardware availability + ping
-└── telemetry.py       ← session stats
-```
-
-### Hardware helpers
-
-| Import | Provides |
-| ------ | -------- |
-| `from app.hardware import rrb3_driver` | `set_motors()`, `get_distance()`, `available` |
-| `from app.hardware import servo_driver` | `move()`, `center()`, `available` |
-| `from app.hardware import camera_driver` | `get_frame()`, `get_frame_if_new(counter)`, `start()`, `stop()`, `available`, `_backend` |
-| `from app.config import settings` | all `.env` values |
-| `from app import telemetry` | `record_command()` |
-
----
-
-## Future Implementations
-
-- **Auto-drive** — fully autonomous navigation using the sonar sensor
-- **Path following** — define a waypoint route; the car executes it autonomously
-- **Visual search** — roam until the camera finds a target image match, then alert
-- **Buzzer feedback** — audio confirmation for commands and obstacle alerts
-- **Light control** — toggle RRB3 onboard LEDs from the UI
-- **Battery monitoring** — display voltage from the RRB3 ADC
-
----
-
-## Adapting to Different Hardware
-
-Only the files in `app/hardware/` are tied to specific components. Everything else is hardware-agnostic.
-
-### Alternative microcomputers
-
-| Board | Notes |
-| ----- | ----- |
-| **NVIDIA Jetson Nano** | Swap `RPi.GPIO` for `Jetson.GPIO` (same API). |
-| **Orange Pi / Banana Pi** | Use `OPi.GPIO` or `wiringOP`. |
-| **BeagleBone Black** | Use `Adafruit_BBIO`. |
-| **Arduino (co-processor)** | Send serial commands from `rrb3_driver.py` over USB. |
-
-### Alternative motor drivers
+**Alternative motor drivers:**
 
 | Driver | Notes |
 | ------ | ----- |
-| **L298N** | Direct `RPi.GPIO` PWM — no extra library. |
-| **Adafruit Motor HAT** | `adafruit-circuitpython-motorkit`. |
-| **Cytron MDD3A / MDD10A** | PWM + direction pins, same pattern as L298N. |
-| **Pololu DRV8833** | Two PWM pins per motor. |
+| L298N | Direct `RPi.GPIO` PWM — no extra library |
+| Adafruit Motor HAT | `adafruit-circuitpython-motorkit` |
+| Cytron MDD3A / MDD10A | PWM + direction pins, same pattern as L298N |
 
-### Additional components
+**Sensors and extras:**
 
 | Component | Library |
 | --------- | ------- |
-| **Encoder wheels** | `RPi.GPIO` interrupt — accurate odometry. |
-| **IMU (MPU-6050)** | `mpu6050-raspberrypi` — orientation + acceleration. |
-| **LIDAR (RPLidar A1)** | `rplidar-roboticia` — 2D mapping for auto-drive. |
-| **NeoPixel LEDs** | `rpi_ws281x` — controllable RGB lighting. |
-| **GPS module** | `gpsd` + `gps3` — real-world position. |
+| Encoder wheels | `RPi.GPIO` interrupt — accurate odometry |
+| IMU (MPU-6050) | `mpu6050-raspberrypi` |
+| LIDAR (RPLidar A1) | `rplidar-roboticia` — 2D mapping |
+| NeoPixel LEDs | `rpi_ws281x` |
+| GPS module | `gpsd` + `gps3` |
+
+### Future implementations
+
+- Auto-drive — obstacle avoidance free-roam
+- Path following — execute a waypoint route
+- Visual search — roam until the camera matches a target image
+- Buzzer feedback — audio confirmation for commands
+- Light control — toggle RRB3 onboard LEDs
+- Battery monitoring — live voltage display

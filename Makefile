@@ -13,7 +13,7 @@ PI_URL      = http://$(shell echo $(PI_HOST) | cut -d@ -f2):8000
 
 SSH         = ssh -i $(SSH_KEY) $(PI_HOST)
 
-.PHONY: help connect deploy restart logs logs-tail status test open set-password
+.PHONY: help connect deploy restart logs logs-tail status check test open set-password
 
 help:          ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -23,7 +23,7 @@ connect:       ## Open an SSH shell on the robot
 	$(SSH) -t "cd $(PI_DIR) && exec bash -l"
 
 _wait_ready = for i in 1 2 3 4 5 6 7 8 9 10; do \
-	curl -s http://localhost:8000/api/status && echo && break || sleep 2; done
+	curl -s http://localhost:8000/api/ping && echo && break || sleep 2; done
 
 deploy:        ## Push latest git commits to the robot and restart the service
 	@echo "=== Deploying to $(PI_HOST) ==="
@@ -70,7 +70,13 @@ logs-tail:     ## Show last 50 log lines from the robot
 
 status:        ## Check if the app is running on the robot
 	$(SSH) "systemctl is-active robocontrol && \
-	        curl -s http://localhost:8000/api/status && echo"
+	        curl -s http://localhost:8000/api/ping && echo"
+
+check:         ## Quick remote health check (ping + git rev)
+	@echo "=== Health check: $(PI_HOST) ==="
+	$(SSH) "curl -s http://localhost:8000/api/ping && echo && \
+	        cd $(PI_DIR) && git rev-parse --short HEAD && git log -1 --format='%s'"
+	@echo "=== $(PI_URL) ==="
 
 test:          ## Run the test suite locally (no hardware needed)
 	python -m pytest tests/ -v

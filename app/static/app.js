@@ -48,6 +48,7 @@ function onStreamError(id) {
     if (el) {
       var base = el.getAttribute('data-src') || el.src.split('?')[0];
       el.setAttribute('data-src', base);
+      el.src = '';
       el.src = base + '?t=' + Date.now();
     }
   }, 3000);
@@ -69,6 +70,7 @@ function reconnectStreams() {
       if (corner) corner.classList.add('spinning');
       var base = el.getAttribute('data-src') || el.src.split('?')[0];
       el.setAttribute('data-src', base);
+      el.src = '';
       el.src = base + '?t=' + Date.now();
     }
   });

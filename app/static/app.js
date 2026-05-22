@@ -29,7 +29,8 @@ function notify(message, type) {
 
 // ── Stream reconnect ───────────────────────────────────────────
 var _streamRetry = {};
-var _streamDead = {};   // tracks ids showing the dead overlay
+var _streamDead = {};      // tracks ids showing the dead overlay
+var _streamSuppressErr = {}; // one-shot: eat the onerror fired by el.src=''
 
 function _setStreamDead(id, dead) {
   _streamDead[id] = dead;
@@ -40,11 +41,12 @@ function _setStreamDead(id, dead) {
 }
 
 function onStreamError(id) {
+  if (_streamSuppressErr[id]) { _streamSuppressErr[id] = false; return; }
   _setStreamDead(id, true);
   if (_streamRetry[id]) return;
   _streamRetry[id] = setTimeout(function() {
-    // Keep _streamRetry[id] truthy during the src swap so the onerror fired
-    // by el.src='' is suppressed by the guard above — not nulled until after.
+    _streamRetry[id] = null;
+    _streamSuppressErr[id] = true;
     var el = document.getElementById(id);
     if (el) {
       var base = el.getAttribute('data-src') || el.src.split('?')[0];
@@ -52,11 +54,11 @@ function onStreamError(id) {
       el.src = '';
       el.src = base + '?t=' + Date.now();
     }
-    setTimeout(function() { _streamRetry[id] = null; }, 200);
   }, 3000);
 }
 
 function onStreamLoad(id) {
+  _streamSuppressErr[id] = false;
   _setStreamDead(id, false);
   clearTimeout(_streamRetry[id]);
   _streamRetry[id] = null;
@@ -65,7 +67,8 @@ function onStreamLoad(id) {
 function reconnectStreams() {
   ['cam-stream', 'pip-cam'].forEach(function(id) {
     clearTimeout(_streamRetry[id]);
-    _streamRetry[id] = true;  // sentinel: blocks onerror from el.src='' below
+    _streamRetry[id] = null;
+    _streamSuppressErr[id] = true;
     var el = document.getElementById(id);
     if (el && el.tagName === 'IMG') {
       var corner = document.getElementById(id + '-corner');
@@ -75,7 +78,6 @@ function reconnectStreams() {
       el.src = '';
       el.src = base + '?t=' + Date.now();
     }
-    setTimeout(function() { _streamRetry[id] = null; }, 200);
   });
 }
 

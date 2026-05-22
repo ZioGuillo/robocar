@@ -1,32 +1,47 @@
 #!/usr/bin/env bash
-# Upgrade robocar on the Pi from the public GitHub repo and restart the service.
+# Deploy latest code to the robocar and restart the service.
 # Usage: bash scripts/deploy.sh
-# Override: PI_HOST=pi@192.168.1.93 VENV=/home/pi/robocar-venv bash scripts/deploy.sh
+# Override: ROBOCAR_HOST=ec2-user@192.168.1.93 bash scripts/deploy.sh
 set -euo pipefail
 
-PI_HOST="${PI_HOST:-pi@192.168.1.93}"
-VENV="${VENV:-/home/pi/robocar-venv}"
+ROBOCAR_HOST="${ROBOCAR_HOST:-ec2-user@192.168.1.93}"
+REMOTE_DIR="/home/ec2-user/robocontrol"
+SERVICE_NAME="robocontrol"
 
 echo "=== robocar deploy ==="
-echo "Target : $PI_HOST"
+echo "Target : $ROBOCAR_HOST"
 echo ""
 
-ssh "$PI_HOST" bash << ENDSSH
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "→ Syncing systemd service file"
+scp "$SCRIPT_DIR/robocontrol.service" "$ROBOCAR_HOST:/tmp/robocontrol.service"
+
+ssh "$ROBOCAR_HOST" bash << ENDSSH
 set -e
-echo "→ Upgrading robocar package"
-$VENV/bin/pip install --upgrade "git+https://github.com/ZioGuillo/robocar.git" -q
+
+echo "→ Installing service file"
+sudo mv /tmp/robocontrol.service /etc/systemd/system/${SERVICE_NAME}.service
+sudo systemctl daemon-reload
+
+echo "→ Pulling latest code"
+cd ${REMOTE_DIR}
+git pull
+
 echo "→ Restarting service"
-sudo systemctl restart robocar
-sleep 2
-if systemctl is-active --quiet robocar; then
-    echo "✓ robocar is running"
+sudo systemctl restart ${SERVICE_NAME}
+sleep 3
+
+if systemctl is-active --quiet ${SERVICE_NAME}; then
+    echo "✓ ${SERVICE_NAME} is running"
+    systemctl status ${SERVICE_NAME} --no-pager -l | tail -6
 else
     echo "✗ Service failed — last 30 log lines:"
-    journalctl -u robocar -n 30 --no-pager
+    journalctl -u ${SERVICE_NAME} -n 30 --no-pager
     exit 1
 fi
 ENDSSH
 
 echo ""
 echo "=== Deploy complete ==="
-echo "  Logs : ssh $PI_HOST journalctl -u robocar -f"
+echo "  Logs : ssh $ROBOCAR_HOST journalctl -u $SERVICE_NAME -f"

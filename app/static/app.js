@@ -29,8 +29,7 @@ function notify(message, type) {
 
 // ── Stream reconnect ───────────────────────────────────────────
 var _streamRetry = {};
-var _streamDead = {};      // tracks ids showing the dead overlay
-var _streamSuppressErr = {}; // one-shot: eat the onerror fired by el.src=''
+var _streamDead = {};
 
 function _setStreamDead(id, dead) {
   _streamDead[id] = dead;
@@ -40,25 +39,29 @@ function _setStreamDead(id, dead) {
   if (corner)  corner.classList.toggle('spinning', dead);
 }
 
+// Replace the <img> with a fresh clone so the browser opens a brand-new
+// connection — avoids stale MJPEG state without a full page reload.
+function _replaceStreamImg(id) {
+  var old = document.getElementById(id);
+  if (!old || old.tagName !== 'IMG' || !old.parentNode) return;
+  var base = old.getAttribute('data-src') || old.src.split('?')[0];
+  var img = old.cloneNode(false);   // copies all attributes + inline handlers
+  img.setAttribute('data-src', base);
+  img.removeAttribute('src');
+  old.parentNode.replaceChild(img, old);
+  img.src = base + '?t=' + Date.now();
+}
+
 function onStreamError(id) {
-  if (_streamSuppressErr[id]) { _streamSuppressErr[id] = false; return; }
   _setStreamDead(id, true);
   if (_streamRetry[id]) return;
   _streamRetry[id] = setTimeout(function() {
     _streamRetry[id] = null;
-    _streamSuppressErr[id] = true;
-    var el = document.getElementById(id);
-    if (el) {
-      var base = el.getAttribute('data-src') || el.src.split('?')[0];
-      el.setAttribute('data-src', base);
-      el.src = '';
-      el.src = base + '?t=' + Date.now();
-    }
+    _replaceStreamImg(id);
   }, 3000);
 }
 
 function onStreamLoad(id) {
-  _streamSuppressErr[id] = false;
   _setStreamDead(id, false);
   clearTimeout(_streamRetry[id]);
   _streamRetry[id] = null;
@@ -68,26 +71,17 @@ function reconnectStreams() {
   ['cam-stream', 'pip-cam'].forEach(function(id) {
     clearTimeout(_streamRetry[id]);
     _streamRetry[id] = null;
-    _streamSuppressErr[id] = true;
-    var el = document.getElementById(id);
-    if (el && el.tagName === 'IMG') {
-      var corner = document.getElementById(id + '-corner');
-      if (corner) corner.classList.add('spinning');
-      var base = el.getAttribute('data-src') || el.src.split('?')[0];
-      el.setAttribute('data-src', base);
-      el.src = '';
-      el.src = base + '?t=' + Date.now();
-    }
+    var corner = document.getElementById(id + '-corner');
+    if (corner) corner.classList.add('spinning');
+    _replaceStreamImg(id);
   });
 }
 
 function reconnectAll() {
   _statusDisconnected = false;
-  // Full page reload is the only reliable way to re-establish MJPEG streams.
-  // Fade out first so the reload feels intentional rather than jarring.
-  document.body.style.transition = 'opacity 0.35s';
-  document.body.style.opacity = '0';
-  setTimeout(function() { location.reload(); }, 370);
+  var btn = document.getElementById('reconnect-btn');
+  if (btn) btn.style.display = 'none';
+  reconnectStreams();
 }
 
 // ── Camera heartbeat — detect frozen/dead MJPEG streams ────────

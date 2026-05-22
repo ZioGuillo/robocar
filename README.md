@@ -459,7 +459,7 @@ Controls implemented:
 
 RoboControl exports a Prometheus-compatible `/metrics` endpoint that any Prometheus server can scrape.
 
-```
+```text
 GET http://<pi-ip>:8000/metrics
 ```
 

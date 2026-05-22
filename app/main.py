@@ -22,9 +22,13 @@ from app.templates_env import templates
 from app import db, metrics as m
 
 
+_WIGGLE_FLAG = Path("/tmp/robocar_wiggle_done")
+
 async def _ready_wiggle():
-    if not driver.available:
+    """Wiggle motors once per boot (flag lives in /tmp, cleared on Pi reboot)."""
+    if not driver.available or _WIGGLE_FLAG.exists():
         return
+    _WIGGLE_FLAG.touch()
     speed = 0.4
     try:
         driver.set_motors(speed / 2, 0, speed / 2, 0)
@@ -35,7 +39,7 @@ async def _ready_wiggle():
         await asyncio.sleep(0.3)
         driver.set_motors(0, 0, 0, 0)
     except Exception:
-        pass
+        _WIGGLE_FLAG.unlink(missing_ok=True)
 
 
 @asynccontextmanager

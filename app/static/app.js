@@ -43,7 +43,8 @@ function onStreamError(id) {
   _setStreamDead(id, true);
   if (_streamRetry[id]) return;
   _streamRetry[id] = setTimeout(function() {
-    _streamRetry[id] = null;
+    // Keep _streamRetry[id] truthy during the src swap so the onerror fired
+    // by el.src='' is suppressed by the guard above — not nulled until after.
     var el = document.getElementById(id);
     if (el) {
       var base = el.getAttribute('data-src') || el.src.split('?')[0];
@@ -51,6 +52,7 @@ function onStreamError(id) {
       el.src = '';
       el.src = base + '?t=' + Date.now();
     }
+    setTimeout(function() { _streamRetry[id] = null; }, 200);
   }, 3000);
 }
 
@@ -63,7 +65,7 @@ function onStreamLoad(id) {
 function reconnectStreams() {
   ['cam-stream', 'pip-cam'].forEach(function(id) {
     clearTimeout(_streamRetry[id]);
-    _streamRetry[id] = null;
+    _streamRetry[id] = true;  // sentinel: blocks onerror from el.src='' below
     var el = document.getElementById(id);
     if (el && el.tagName === 'IMG') {
       var corner = document.getElementById(id + '-corner');
@@ -73,6 +75,7 @@ function reconnectStreams() {
       el.src = '';
       el.src = base + '?t=' + Date.now();
     }
+    setTimeout(function() { _streamRetry[id] = null; }, 200);
   });
 }
 

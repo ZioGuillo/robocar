@@ -83,9 +83,11 @@ function reconnectStreams() {
 
 function reconnectAll() {
   _statusDisconnected = false;
-  var btn = document.getElementById('reconnect-btn');
-  if (btn) btn.style.display = 'none';
-  reconnectStreams();
+  // Full page reload is the only reliable way to re-establish MJPEG streams.
+  // Fade out first so the reload feels intentional rather than jarring.
+  document.body.style.transition = 'opacity 0.35s';
+  document.body.style.opacity = '0';
+  setTimeout(function() { location.reload(); }, 370);
 }
 
 // ── Camera heartbeat — detect frozen/dead MJPEG streams ────────

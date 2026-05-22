@@ -38,7 +38,8 @@ Control a Raspberry Pi robot car from any browser — no app, no cables, no sold
 7. [Configuration Reference](#7-configuration-reference)
 8. [API Reference](#8-api-reference)
 9. [Security](#9-security)
-10. [Developer Guide](#10-developer-guide)
+10. [Monitoring](#10-monitoring)
+11. [Developer Guide](#11-developer-guide)
 
 ---
 
@@ -454,7 +455,80 @@ Controls implemented:
 
 ---
 
-## 10. Developer Guide
+## 10. Monitoring
+
+RoboControl exports a Prometheus-compatible `/metrics` endpoint that any Prometheus server can scrape.
+
+```
+GET http://<pi-ip>:8000/metrics
+```
+
+The path requires no authentication so Prometheus can scrape without a session token.
+Metrics are refreshed every **5 seconds** by the background telemetry thread.
+
+### Scrape config
+
+```yaml
+scrape_configs:
+  - job_name: robocar
+    static_configs:
+      - targets: ['<pi-ip>:8000']
+    metrics_path: /metrics
+    scrape_interval: 5s
+```
+
+### Metrics reference
+
+| Category | Metric | Type | Description |
+| -------- | ------ | ---- | ----------- |
+| **System** | `robocar_cpu_percent` | Gauge | CPU usage (0–100) |
+| | `robocar_cpu_temperature_celsius` | Gauge | SoC temperature in °C (Pi only — 0 on other hw) |
+| | `robocar_ram_used_bytes` | Gauge | RAM used in bytes |
+| | `robocar_ram_total_bytes` | Gauge | Total RAM in bytes |
+| | `robocar_disk_used_bytes` | Gauge | Disk used bytes (/) |
+| | `robocar_disk_total_bytes` | Gauge | Disk total bytes (/) |
+| | `robocar_uptime_seconds` | Gauge | Server uptime in seconds |
+| **Hardware** | `robocar_hardware_available{component}` | Gauge | Component status — 1=up, 0=down; labels: `motors`, `camera`, `servo` |
+| **Motors** | `robocar_motor_commands_total{action}` | Counter | Motor commands dispatched; labels: `forward`, `reverse`, `left`, `right`, `stop` |
+| | `robocar_motor_blocked_total` | Counter | Forward commands blocked by obstacle detection |
+| | `robocar_estimated_distance_meters` | Gauge | Estimated distance driven this session in meters |
+| **Sensor** | `robocar_sonar_distance_cm` | Gauge | Last ultrasonic reading in cm (0 = no reading yet) |
+| | `robocar_obstacles_total` | Counter | Obstacle detections triggering auto-stop |
+| **Camera** | `robocar_camera_frames_total` | Counter | MJPEG frames captured by the camera driver |
+| **HTTP** | `robocar_http_requests_total{method,path,status}` | Counter | HTTP requests handled |
+| | `robocar_http_request_duration_seconds{path}` | Histogram | Request latency; buckets 5 ms → 2.5 s |
+| **Auth** | `robocar_login_attempts_total{result}` | Counter | Login attempts; labels: `success`, `failure` |
+| | `robocar_rate_limit_hits_total{endpoint}` | Counter | Rate limit rejections; labels: `login`, `motors` |
+| | `robocar_active_sessions_total` | Gauge | Currently active (non-expired) user sessions |
+| **Build** | `robocar_build_info` | Info | Static labels: `version="2.0"`, `hardware="rpi4"` |
+
+### Grafana PromQL examples
+
+```promql
+# CPU usage live
+robocar_cpu_percent
+
+# HTTP request rate (last 5 min)
+rate(robocar_http_requests_total[5m])
+
+# P95 request latency
+histogram_quantile(0.95, rate(robocar_http_request_duration_seconds_bucket[5m]))
+
+# Motor command breakdown
+rate(robocar_motor_commands_total[5m])
+
+# Obstacle detection rate
+rate(robocar_obstacles_total[5m])
+
+# Active sessions
+robocar_active_sessions_total
+```
+
+All metric definitions live in `app/metrics.py`. The `/metrics` route is registered in `app/main.py`.
+
+---
+
+## 11. Developer Guide
 
 ### Enabling the Pi Camera (CSI)
 

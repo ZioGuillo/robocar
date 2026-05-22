@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from app.hardware import rrb3_driver as driver
 from app.config import settings
-from app import telemetry
+from app import telemetry, metrics as m
 
 router = APIRouter(prefix="/api/motors")
 
@@ -73,6 +73,10 @@ async def motor_action(action: str, body: MotorRequest = None):
                 driver.set_motors(0, 0, 0, 0)
                 telemetry.record_obstacle(dist)
                 telemetry.record_command((time.monotonic() - t0) * 1000, action, speed)
+                m.MOTOR_CMDS_TOTAL.labels(action=action).inc()
+                m.MOTOR_BLOCKED_TOTAL.inc()
+                m.OBSTACLES_TOTAL.inc()
+                m.SONAR_DISTANCE_CM.set(dist)
                 return {
                     "ok": False,
                     "action": "forward",
@@ -91,4 +95,5 @@ async def motor_action(action: str, body: MotorRequest = None):
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail={"ok": False, "message": str(e)})
     telemetry.record_command((time.monotonic() - t0) * 1000, action, speed)
+    m.MOTOR_CMDS_TOTAL.labels(action=action).inc()
     return {"ok": True, "action": action}

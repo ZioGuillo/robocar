@@ -17,3 +17,4 @@ RPi.GPIO>=0.7.1
 # Without it, ml_driver.available = False and detection is silently disabled.
 Pillow>=10.0.0
 psutil>=5.9.0
+prometheus-client>=0.20.0

@@ -44,6 +44,14 @@ def _sample_loop() -> None:
             _sys["ram_percent"]  = round(mem.percent, 1)
         except Exception:
             pass
+        # Push fresh values into Prometheus gauges
+        try:
+            from app import metrics as _m
+            from app.hardware import camera_driver as _cam
+            _m.update_system_gauges(snapshot(), _cam._frame_counter)
+            _m.update_active_sessions()
+        except Exception:
+            pass
 
 
 threading.Thread(target=_sample_loop, daemon=True).start()

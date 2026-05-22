@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import json
 import pkgutil
+import time
 from base64 import b64decode
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,6 +11,7 @@ import itsdangerous
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from starlette.middleware.sessions import SessionMiddleware
 
 import app.routes as _routes_pkg
@@ -17,7 +19,7 @@ from app.config import settings
 from app.hardware import servo_driver, rrb3_driver as driver, camera_driver, ml_driver
 from app.security import rate_limiter
 from app.templates_env import templates
-from app import db
+from app import db, metrics as m
 
 
 async def _ready_wiggle():
@@ -44,6 +46,10 @@ async def lifespan(app: FastAPI):
     camera_driver.start()
     ml_driver.start()
     await _ready_wiggle()
+    # Seed hardware availability gauges once at startup
+    m.HW_AVAILABLE.labels(component="motors").set(1 if driver.available else 0)
+    m.HW_AVAILABLE.labels(component="camera").set(1 if camera_driver.available else 0)
+    m.HW_AVAILABLE.labels(component="servo").set(1 if servo_driver.available else 0)
     yield
     ml_driver.stop()
     camera_driver.stop()
@@ -53,8 +59,20 @@ app = FastAPI(lifespan=lifespan)
 _https_only = settings.base_url.startswith("https://") if settings.base_url else False
 app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key, https_only=_https_only)
 
-_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/api/ping"}
+_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/api/ping", "/metrics"}
 _signer = itsdangerous.TimestampSigner(settings.session_secret_key)
+
+
+def _norm_path(path: str) -> str:
+    """Normalise URL path for use as a Prometheus label (avoid cardinality explosion)."""
+    # /api/motors/forward  → /api/motors
+    # /api/camera/stream   → /api/camera
+    # /settings/password   → /settings
+    # /                    → /
+    parts = path.strip("/").split("/")
+    if len(parts) >= 2 and parts[0] in ("api", "settings", "auth"):
+        return "/" + "/".join(parts[:2])
+    return "/" + parts[0] if parts[0] else "/"
 
 
 def _get_session_token(request: Request) -> str | None:
@@ -71,6 +89,20 @@ def _get_session_token(request: Request) -> str | None:
 
 
 @app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Record HTTP request count and duration for Prometheus."""
+    t0 = time.monotonic()
+    response = await call_next(request)
+    duration = time.monotonic() - t0
+    path = _norm_path(request.url.path)
+    m.HTTP_REQUESTS_TOTAL.labels(
+        method=request.method, path=path, status=response.status_code
+    ).inc()
+    m.HTTP_DURATION.labels(path=path).observe(duration)
+    return response
+
+
+@app.middleware("http")
 async def auth_guard(request: Request, call_next):
     path = request.url.path
 
@@ -80,7 +112,8 @@ async def auth_guard(request: Request, call_next):
     # Brute-force protection on login
     if path == "/login" and request.method == "POST":
         client_ip = request.client.host if request.client else "unknown"
-        if not rate_limiter.is_allowed(f"login:{client_ip}", 5):  # 5 attempts/second
+        if not rate_limiter.is_allowed(f"login:{client_ip}", 5):
+            m.RATE_LIMIT_HITS_TOTAL.labels(endpoint="login").inc()
             return JSONResponse(
                 {"ok": False, "message": "Too many login attempts — please wait"},
                 status_code=429,
@@ -102,6 +135,7 @@ async def auth_guard(request: Request, call_next):
             and request.method == "POST"):
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"motor:{client_ip}", settings.motor_rate_limit):
+            m.RATE_LIMIT_HITS_TOTAL.labels(endpoint="motors").inc()
             return JSONResponse(
                 {"ok": False, "message": "Rate limit exceeded — slow down"},
                 status_code=429,
@@ -119,6 +153,12 @@ for _mod_info in pkgutil.iter_modules(_routes_pkg.__path__):
         app.include_router(_router)
 
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
+
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    """Prometheus scrape endpoint — exposes all robocar metrics."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/")

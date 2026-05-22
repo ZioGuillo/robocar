@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
-from app import auth, db
+from app import auth, db, metrics as m
 from app.config import settings
 from app.templates_env import templates
 
@@ -32,7 +32,9 @@ async def login(
 ):
     user = db.get_user_by_username(username)
     if not user or not db.verify_password(password, user["password_hash"] or ""):
+        m.LOGIN_ATTEMPTS_TOTAL.labels(result="failure").inc()
         return RedirectResponse("/login?status=invalid", status_code=302)
+    m.LOGIN_ATTEMPTS_TOTAL.labels(result="success").inc()
     token = db.create_session(user["id"])
     request.session["token"] = token
     return RedirectResponse("/", status_code=302)

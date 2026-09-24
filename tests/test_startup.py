@@ -1,5 +1,18 @@
 from unittest.mock import patch, call
 
+import pytest
+
+from app.main import _WIGGLE_FLAG
+
+
+@pytest.fixture(autouse=True)
+def _clear_wiggle_flag():
+    """The flag file persists across process runs by design (once per Pi boot),
+    which makes it leak between test runs unless cleared explicitly."""
+    _WIGGLE_FLAG.unlink(missing_ok=True)
+    yield
+    _WIGGLE_FLAG.unlink(missing_ok=True)
+
 
 def test_wiggle_fires_when_hardware_available():
     with patch("app.hardware.rrb3_driver.available", True), \

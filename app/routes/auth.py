@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
@@ -46,12 +48,20 @@ async def github_redirect(request: Request):
     if not client_id or db.get_setting("github_oauth_enabled") != "true":
         return RedirectResponse("/login", status_code=302)
     redirect_uri = _base_url(request) + "/auth/callback"
-    return RedirectResponse(auth.build_github_auth_url(client_id, redirect_uri), status_code=302)
+    state = secrets.token_urlsafe(24)
+    request.session["oauth_state"] = state
+    return RedirectResponse(
+        auth.build_github_auth_url(client_id, redirect_uri, state), status_code=302
+    )
 
 
 @router.get("/auth/callback")
-async def github_callback(request: Request, code: str = "", error: str = ""):
+async def github_callback(request: Request, code: str = "", state: str = "", error: str = ""):
     if error or not code:
+        return RedirectResponse("/login?status=error", status_code=302)
+
+    expected_state = request.session.pop("oauth_state", None)
+    if not expected_state or not secrets.compare_digest(state, expected_state):
         return RedirectResponse("/login?status=error", status_code=302)
 
     client_id = db.get_setting("github_client_id")

@@ -1,7 +1,17 @@
+from urllib.parse import urlparse, parse_qs
+
 import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 import app.db as db_module
+
+
+def _start_oauth_and_get_state(client):
+    """Drive /auth/github so the client picks up a valid oauth_state cookie,
+    and return that state value for use on /auth/callback."""
+    r = client.get("/auth/github")
+    location = r.headers["location"]
+    return parse_qs(urlparse(location).query)["state"][0]
 
 
 @pytest.fixture()
@@ -25,13 +35,13 @@ def test_login_shows_github_button_when_enabled(fresh_client):
     db_module.set_setting("github_oauth_enabled", "true")
     db_module.set_setting("github_client_id", "test_client_id")
     r = fresh_client.get("/login")
-    assert b"Login with GitHub" in r.content
+    assert b"Continue with GitHub" in r.content
 
 
 def test_login_hides_github_button_when_disabled(fresh_client):
     db_module.set_setting("github_oauth_enabled", "false")
     r = fresh_client.get("/login")
-    assert b"Login with GitHub" not in r.content
+    assert b"Continue with GitHub" not in r.content
 
 
 def test_login_success_redirects_to_root(fresh_client):
@@ -90,12 +100,13 @@ def test_github_callback_pending_user_redirects_to_pending(fresh_client):
     db_module.set_setting("github_oauth_enabled", "true")
     db_module.set_setting("github_client_id", "cid")
     db_module.set_setting("github_client_secret", "csecret")
+    state = _start_oauth_and_get_state(fresh_client)
 
     with patch("app.routes.auth.auth.exchange_github_code", new=AsyncMock(return_value="token123")), \
          patch("app.routes.auth.auth.get_github_profile", new=AsyncMock(return_value={
              "id": 777, "login": "newuser", "avatar_url": ""
          })):
-        r = fresh_client.get("/auth/callback?code=validcode")
+        r = fresh_client.get(f"/auth/callback?code=validcode&state={state}")
     assert r.status_code == 302
     assert "status=pending" in r.headers["location"]
 
@@ -106,11 +117,60 @@ def test_github_callback_approved_user_redirects_to_root(fresh_client):
     db_module.set_setting("github_client_secret", "csecret")
     user = db_module.upsert_github_user(888, "approved_user", "")
     db_module.set_user_role(user["id"], "approved")
+    state = _start_oauth_and_get_state(fresh_client)
 
     with patch("app.routes.auth.auth.exchange_github_code", new=AsyncMock(return_value="token123")), \
          patch("app.routes.auth.auth.get_github_profile", new=AsyncMock(return_value={
              "id": 888, "login": "approved_user", "avatar_url": ""
          })):
-        r = fresh_client.get("/auth/callback?code=validcode")
+        r = fresh_client.get(f"/auth/callback?code=validcode&state={state}")
     assert r.status_code == 302
     assert r.headers["location"] == "/"
+
+
+def test_github_callback_rejects_missing_state(fresh_client):
+    db_module.set_setting("github_oauth_enabled", "true")
+    db_module.set_setting("github_client_id", "cid")
+    db_module.set_setting("github_client_secret", "csecret")
+    _start_oauth_and_get_state(fresh_client)  # seeds a valid state in the session
+
+    with patch("app.routes.auth.auth.exchange_github_code", new=AsyncMock(return_value="token123")), \
+         patch("app.routes.auth.auth.get_github_profile", new=AsyncMock(return_value={
+             "id": 999, "login": "attacker_linked", "avatar_url": ""
+         })):
+        r = fresh_client.get("/auth/callback?code=validcode")
+    assert r.status_code == 302
+    assert "status=error" in r.headers["location"]
+
+
+def test_github_callback_rejects_mismatched_state(fresh_client):
+    db_module.set_setting("github_oauth_enabled", "true")
+    db_module.set_setting("github_client_id", "cid")
+    db_module.set_setting("github_client_secret", "csecret")
+    _start_oauth_and_get_state(fresh_client)  # seeds a valid state in the session
+
+    with patch("app.routes.auth.auth.exchange_github_code", new=AsyncMock(return_value="token123")), \
+         patch("app.routes.auth.auth.get_github_profile", new=AsyncMock(return_value={
+             "id": 999, "login": "attacker_linked", "avatar_url": ""
+         })):
+        r = fresh_client.get("/auth/callback?code=validcode&state=not-the-real-state")
+    assert r.status_code == 302
+    assert "status=error" in r.headers["location"]
+
+
+def test_github_callback_rejects_replayed_state(fresh_client):
+    """A state token must not be usable twice (protects against callback replay)."""
+    db_module.set_setting("github_oauth_enabled", "true")
+    db_module.set_setting("github_client_id", "cid")
+    db_module.set_setting("github_client_secret", "csecret")
+    state = _start_oauth_and_get_state(fresh_client)
+
+    with patch("app.routes.auth.auth.exchange_github_code", new=AsyncMock(return_value="token123")), \
+         patch("app.routes.auth.auth.get_github_profile", new=AsyncMock(return_value={
+             "id": 777, "login": "newuser", "avatar_url": ""
+         })):
+        first = fresh_client.get(f"/auth/callback?code=validcode&state={state}")
+        second = fresh_client.get(f"/auth/callback?code=validcode&state={state}")
+    assert first.status_code == 302
+    assert "status=pending" in first.headers["location"]
+    assert "status=error" in second.headers["location"]

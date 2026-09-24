@@ -5,11 +5,14 @@ _GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 _GITHUB_USER_URL = "https://api.github.com/user"
 
 
-def build_github_auth_url(client_id: str, redirect_uri: str) -> str:
-    return (
+def build_github_auth_url(client_id: str, redirect_uri: str, state: str = "") -> str:
+    url = (
         f"{_GITHUB_AUTH_URL}?client_id={client_id}"
         f"&scope=read:user&redirect_uri={redirect_uri}"
     )
+    if state:
+        url += f"&state={state}"
+    return url
 
 
 async def exchange_github_code(

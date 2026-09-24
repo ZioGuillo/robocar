@@ -396,7 +396,7 @@ All settings live in `~/robocontrol/.env`:
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
-| `SESSION_SECRET_KEY` | *(required)* | Signs session cookies — 32+ random chars |
+| `SESSION_SECRET_KEY` | *(auto-generated)* | Signs session cookies — 32+ random chars. Setting it explicitly is still recommended; if omitted, a random key is generated once and persisted to `data_dir/session_secret_key` |
 | `PORT` | `8000` | HTTP port |
 | `BASE_URL` | *(empty)* | Public URL when behind Cloudflare or a proxy — required for GitHub OAuth |
 | `CAMERA_STREAM_URL` | *(empty)* | Fallback MJPEG URL if no local camera is detected |

@@ -126,7 +126,7 @@ async def auth_guard(request: Request, call_next):
     token = _get_session_token(request)
     user = db.get_session_user(token) if token else None
 
-    if user is None:
+    if user is None or user["role"] not in ("admin", "approved"):
         return RedirectResponse("/login", status_code=302)
 
     if path.startswith("/settings") and path != "/settings/icon" and user["role"] != "admin":

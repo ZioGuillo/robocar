@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from app.auth import build_github_auth_url, exchange_github_code, get_github_profile
 
 
@@ -11,9 +11,14 @@ def test_build_github_auth_url():
     assert url.startswith("https://github.com/login/oauth/authorize")
 
 
+def test_build_github_auth_url_includes_state_when_given():
+    url = build_github_auth_url("myclientid", "https://example.com/auth/callback", state="xyz123")
+    assert "state=xyz123" in url
+
+
 @pytest.mark.asyncio
 async def test_exchange_github_code_success():
-    mock_resp = AsyncMock()
+    mock_resp = Mock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"access_token": "gho_abc123", "token_type": "bearer"}
 
@@ -30,7 +35,7 @@ async def test_exchange_github_code_success():
 
 @pytest.mark.asyncio
 async def test_exchange_github_code_failure():
-    mock_resp = AsyncMock()
+    mock_resp = Mock()
     mock_resp.status_code = 401
     mock_resp.json.return_value = {}
 
@@ -47,7 +52,7 @@ async def test_exchange_github_code_failure():
 
 @pytest.mark.asyncio
 async def test_get_github_profile_success():
-    mock_resp = AsyncMock()
+    mock_resp = Mock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"id": 42, "login": "octocat", "avatar_url": "https://avatars.example.com/42"}
 
@@ -64,7 +69,7 @@ async def test_get_github_profile_success():
 
 @pytest.mark.asyncio
 async def test_get_github_profile_failure():
-    mock_resp = AsyncMock()
+    mock_resp = Mock()
     mock_resp.status_code = 401
 
     with patch("app.auth.httpx.AsyncClient") as mock_client_cls:

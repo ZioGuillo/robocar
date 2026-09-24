@@ -73,13 +73,6 @@ def init_db() -> None:
                 value TEXT NOT NULL DEFAULT ''
             );
         """)
-        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
-            now = datetime.now(timezone.utc).isoformat()
-            conn.execute(
-                "INSERT INTO users (username, password_hash, role, must_change_password, created_at) "
-                "VALUES (?, ?, 'admin', 1, ?)",
-                ("admin", hash_password(_ADMIN_DEFAULT_PASSWORD), now),
-            )
         for col, definition in [
             ("user_icon", "TEXT DEFAULT 'astronaut'"),
             ("must_change_password", "INTEGER DEFAULT 0"),
@@ -88,6 +81,13 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
             except sqlite3.OperationalError:
                 pass
+        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                "INSERT INTO users (username, password_hash, role, must_change_password, created_at) "
+                "VALUES (?, ?, 'admin', 1, ?)",
+                ("admin", hash_password(_ADMIN_DEFAULT_PASSWORD), now),
+            )
         for key, default in [
             ("github_oauth_enabled", "false"),
             ("github_client_id", ""),
@@ -140,6 +140,8 @@ def set_user_role(user_id: int, role: str) -> None:
         raise ValueError(f"Invalid role: {role!r}")
     with get_conn() as conn:
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+        if role in ("pending", "revoked"):
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
 
 
 def get_all_github_users() -> list[sqlite3.Row]:

@@ -27,15 +27,16 @@ Under the hood it's a FastAPI app with a small hardware abstraction layer, so th
 
 1. [What You Need](#1-what-you-need)
 2. [Install](#2-install)
-3. [First Login](#3-first-login)
-4. [Using the Controller](#4-using-the-controller)
-5. [Internet Access — Optional](#5-internet-access--optional)
-6. [Day-to-day Commands](#6-day-to-day-commands)
-7. [Configuration Reference](#7-configuration-reference)
-8. [API Reference](#8-api-reference)
-9. [Security](#9-security)
-10. [Monitoring](#10-monitoring)
-11. [Developer Guide](#11-developer-guide)
+3. [WiFi Setup](#3-wifi-setup)
+4. [First Login](#4-first-login)
+5. [Using the Controller](#5-using-the-controller)
+6. [Internet Access — Optional](#6-internet-access--optional)
+7. [Day-to-day Commands](#7-day-to-day-commands)
+8. [Configuration Reference](#8-configuration-reference)
+9. [API Reference](#9-api-reference)
+10. [Security](#10-security)
+11. [Monitoring](#11-monitoring)
+12. [Developer Guide](#12-developer-guide)
 
 ---
 
@@ -95,7 +96,7 @@ USB     → USB webcam         (if using)
 
 **Moving the RRB3 board to a Jetson Nano:** the motor driver in `app/hardware/rrb3_driver.py` talks to the RRB3 over the same BCM pin numbers it uses on a Raspberry Pi, via whichever GPIO backend was detected — no code changes needed. What I can't verify for you is the physical wiring: Jetson Nano's 40-pin header matches a Raspberry Pi's layout closely enough for `Jetson.GPIO`'s BCM-compatible mode to work for most digital I/O, but **check your specific pins against a Jetson pinout diagram with a multimeter before powering the board** — a wrong assumption here is the kind of mistake that damages hardware, not just software.
 
-**WiFi setup** ([below](#wifi-setup-without-a-screen)) depends on NetworkManager being the active network manager. That's the Raspberry Pi OS Bookworm default, matching what this whole hardware layer assumes; JetPack's Ubuntu-based images typically ship it too, but I can't confirm that for your specific Jetson image — check with `systemctl status NetworkManager` before relying on it.
+**WiFi setup** ([Section 3](#3-wifi-setup)) depends on NetworkManager being the active network manager. That's the Raspberry Pi OS Bookworm default, matching what this whole hardware layer assumes; JetPack's Ubuntu-based images typically ship it too, but I can't confirm that for your specific Jetson image — check with `systemctl status NetworkManager` before relying on it.
 
 **Testing without any hardware at all:** see [`docker/README.md`](docker/README.md) — `docker compose -f docker/docker-compose.yml up --build` runs the full dashboard with simulated motors/sonar/camera so you can try changes before touching a real board.
 
@@ -172,7 +173,36 @@ http://<pi-ip-address>:8000
 
 ---
 
-## 3. First Login
+## 3. WiFi Setup
+
+Step 1 already got you online once, using the WiFi credentials you set in Raspberry Pi Imager's advanced settings. This section is for everything after that: moving the rover to a different network, setting up a second one somewhere you don't have Imager access, or connecting it without a screen or SD card reader at all.
+
+### Option A — `wifi.txt` on the boot partition
+
+The deterministic way. Before boot, place a `wifi.txt` file on the boot partition (`/boot/firmware/` on Bookworm):
+
+```ini
+SSID=NetworkName
+PASSWORD=NetworkPassword
+```
+
+`wifi-provision.service` reads it on boot and deletes the file once connected, so the password doesn't sit on the SD card indefinitely. To switch networks later, drop a new `wifi.txt` on the boot partition and reboot.
+
+### Option B — the captive portal (no SD card reader needed)
+
+If the device has no working network after a short wait on boot, `wifi-connect-fallback.service` opens its own WiFi network — default SSID `RoboCar-Setup`, no passphrase — with a captive portal:
+
+1. Connect your phone or laptop to `RoboCar-Setup`.
+2. Your device should open the setup page on its own (captive portal detection); if it doesn't, open any URL and it'll redirect there.
+3. Pick the real network from the scanned list and enter its password.
+
+The portal shuts down as soon as it connects, and `robocontrol` becomes reachable at its usual URL on the new network. Set `PORTAL_SSID` / `PORTAL_PASSPHRASE` in `.env` if you want the setup network renamed or passphrase-protected — worth doing if you're setting up somewhere the real WiFi password shouldn't cross an open network, even briefly.
+
+This uses [WiFi Connect](https://github.com/balena-os/wifi-connect) (Apache-2.0), installed automatically by `scripts/install.sh`. It only ever *offers* to help: if `wifi.txt` or a previously-saved network already connects, the portal never appears. It also isn't available until `scripts/install.sh` has run once — it can't help with the very first boot, only every one after.
+
+---
+
+## 4. First Login
 
 Default credentials:
 
@@ -184,7 +214,7 @@ Default credentials:
 
 ---
 
-## 4. Using the Controller
+## 5. Using the Controller
 
 ### Drive tab
 
@@ -241,7 +271,7 @@ Live stats for the current session (resets on restart):
 
 ---
 
-## 5. Internet Access — Optional
+## 6. Internet Access — Optional
 
 By default the rover is only reachable on your local network. This section is for when you want to control it **from anywhere in the world** using a permanent public URL like `https://rover01.yourdomain.com`.
 
@@ -319,32 +349,9 @@ On success:
 
 The script queries your Cloudflare account for existing `roverXX` tunnels and picks the first free slot. Rover01 already set up? The next one becomes rover02 automatically.
 
-### Adding a second rover on a different WiFi
-
-Place a `wifi.txt` file on the boot partition before the first boot:
-
-```ini
-SSID=NetworkName
-PASSWORD=NetworkPassword
-```
-
-The file is deleted automatically after the first successful connection.
-
-To connect to a different network later, drop a new `wifi.txt` on the boot partition and reboot.
-
-### WiFi setup without a screen
-
-No SD card reader handy, or moving the car to a network you don't have credentials for yet? You don't need to pull the card and edit `wifi.txt` — every boot, if the device has no working network after a short wait, `wifi-connect-fallback.service` opens its own WiFi network (default SSID `RoboCar-Setup`, no passphrase) with a captive portal:
-
-1. Connect your phone or laptop to the `RoboCar-Setup` WiFi network.
-2. Your device should auto-open the setup page (captive portal detection); if not, open any URL and it'll redirect.
-3. Pick the real network from the scanned list and enter its password.
-
-The portal shuts down as soon as it connects, and `robocontrol` becomes reachable at its usual URL on the new network. Set `PORTAL_SSID` / `PORTAL_PASSPHRASE` in `.env` to rename the setup network or protect it with a passphrase (recommended if you're setting up somewhere the WiFi password shouldn't be sent over an open network, even briefly).
-
-This uses [WiFi Connect](https://github.com/balena-os/wifi-connect) (Apache-2.0), installed automatically by `scripts/install.sh`. It only ever *offers* to help — if `wifi.txt` or a previously-saved network already connects, it does nothing and you'll never see it.
-
 ### Service startup order
+
+WiFi connects before any of this runs — see [Section 3, WiFi Setup](#3-wifi-setup) if the rover isn't on your network yet. Once it is, the rest of the boot chain looks like this:
 
 ```text
 wifi-provision             ← connects WiFi from wifi.txt (skipped if absent)
@@ -389,7 +396,7 @@ New GitHub users land in `pending` until you approve them in the Settings tab.
 
 ---
 
-## 6. Day-to-day Commands
+## 7. Day-to-day Commands
 
 ### On the Pi
 
@@ -421,7 +428,7 @@ make deploy PI_HOST=pi@192.168.1.50
 
 ---
 
-## 7. Configuration Reference
+## 8. Configuration Reference
 
 All settings live in `~/robocontrol/.env`:
 
@@ -445,7 +452,7 @@ All settings live in `~/robocontrol/.env`:
 
 ---
 
-## 8. API Reference
+## 9. API Reference
 
 | Method | Path | Auth | Description |
 | ------ | ---- | :--: | ----------- |
@@ -462,7 +469,7 @@ Motor commands accept an optional body: `{"speed": 0.75}` (0.0–1.0).
 
 ---
 
-## 9. Security
+## 10. Security
 
 This isn't an audited product, it's a hobby project that happens to control a physical thing over the internet, so it gets treated more carefully than a typical side project. Here's what's actually in place, plainly:
 
@@ -480,7 +487,7 @@ What this doesn't claim to be: independently audited, resistant to a determined 
 
 ---
 
-## 10. Monitoring
+## 11. Monitoring
 
 RoboControl exports a Prometheus-compatible `/metrics` endpoint that any Prometheus server can scrape.
 
@@ -553,7 +560,7 @@ All metric definitions live in `app/metrics.py`. The `/metrics` route is registe
 
 ---
 
-## 11. Developer Guide
+## 12. Developer Guide
 
 ### Enabling the Pi Camera (CSI)
 

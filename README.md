@@ -9,14 +9,9 @@
 ![Hardware](https://img.shields.io/badge/hardware-RRB3-orange?style=flat)
 ![Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat&logo=cloudflare&logoColor=white)
 
-![NASA NPR 2810.1](https://img.shields.io/badge/NASA%20NPR%202810.1-IT%20Security%20Policy-0B3D91?style=flat&logo=nasa&logoColor=white)
-![JPL ICPS](https://img.shields.io/badge/JPL%20ICPS-Engineering%20Standards-C1440E?style=flat&logo=nasa&logoColor=white)
-![Mars Rover Style](https://img.shields.io/badge/Mars%20Rover-Inspired%20Design-B7410E?style=flat&logo=nasa&logoColor=white)
-![NIST SP 800-53](https://img.shields.io/badge/NIST%20SP%20800--53-Rev%205%20Controls-003087?style=flat&logoColor=white)
-![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-Hardened-4A154B?style=flat&logoColor=white)
-![Security Audit](https://img.shields.io/badge/Security%20Audit-Sep%202026-2DC653?style=flat&logoColor=white)
+RoboControl turns a Raspberry Pi (or a Jetson Nano) and a RaspiRobot Board V3 into a small robot car you drive from a web browser. Point your phone at the Pi's IP address and you get a live camera feed, a D-pad, pan/tilt controls, and basic telemetry — no app to install, no cables, nothing to solder beyond the motor board itself.
 
-Control a Raspberry Pi (or Jetson Nano) robot car from any browser — no app, no cables, no soldering beyond the motor board.
+Under the hood it's a FastAPI app with a small hardware abstraction layer, so the same codebase runs the real thing on a Pi or Jetson and a fully simulated version in Docker when you just want to poke at the dashboard. It's a one-person hobby project, not a commercial product, and the README below tries to reflect that: what it actually does, what it doesn't do yet, and what you'd need to check yourself before trusting it with real hardware.
 
 ---
 
@@ -469,25 +464,19 @@ Motor commands accept an optional body: `{"speed": 0.75}` (0.0–1.0).
 
 ## 9. Security
 
-RoboControl's security model is inspired by the frameworks used at **NASA Jet Propulsion Laboratory (JPL)** for mission-critical systems — the same principles that govern the software controlling the Perseverance rover on Mars.
+This isn't an audited product, it's a hobby project that happens to control a physical thing over the internet, so it gets treated more carefully than a typical side project. Here's what's actually in place, plainly:
 
-| Standard | What it covers | Applied in RoboControl |
-| -------- | -------------- | ---------------------- |
-| **NASA NPR 2810.1** | IT Security policy for all NASA systems | Auth, session management, config hygiene |
-| **JPL ICPS** | Institutional Computing Protection Standard — least privilege, strong auth, encryption in transit | RBAC roles, HTTPS via Cloudflare TLS, bcrypt passwords |
-| **NIST SP 800-53 Rev 5** | Federal security controls (AC · IA · AU · SC · SI · CM) | Rate limiting, audit logging, input validation, secrets in `.env` |
-| **OWASP Top 10** | Web application vulnerability baseline | Parameterized SQL, no path traversal, session cookie flags |
+**Passwords and sessions.** Local passwords are hashed with PBKDF2-HMAC-SHA256 (260,000 iterations, random salt per user) — not bcrypt, in case you go looking for it in the code. A session is a random 32-byte token stored in SQLite, referenced by a signed cookie (`itsdangerous`); the cookie can't be forged without the server's secret key, and that key is either the one you set in `.env` or, if you didn't set one, a random value generated on first run and saved to disk rather than falling back to a value baked into the source. Sessions expire after 7 days.
 
-Controls implemented:
+**Roles.** Users are `admin`, `approved`, `pending`, or `revoked`. Revoking someone kills their active session immediately — that wasn't always true (a role change used to leave existing sessions valid until they expired on their own), and it's the kind of bug that matters more here than in most apps, since a revoked user could otherwise still be driving the car.
 
-- **AC — Access Control** — session tokens signed with `itsdangerous`, roles: `admin / approved / pending / revoked`
-- **IA — Authentication** — bcrypt password hashing, GitHub OAuth 2.0, 14-day token expiry, forced first-login password change
-- **AU — Audit** — all HTTP requests logged by uvicorn; obstacles, commands and telemetry stored in SQLite
-- **SC — System Protection** — HTTPS via Cloudflare Tunnel, rate limiting on login (5 req/s) and motor commands (configurable)
-- **SI — Input Integrity** — Pydantic validation on all API inputs, parameterized SQL throughout `app/db.py`
-- **CM — Config Management** — secrets in `.env` (never in source), systemd service isolation
+**GitHub OAuth**, if you turn it on, uses a signed `state` parameter to stop the login-CSRF trick where someone else's OAuth callback gets completed in your browser. New GitHub logins land in `pending` until an admin approves them.
 
-> "Same mission, different budget." — Perseverance cost $2.75 billion and has a dedicated security team. RoboControl costs ~$100 and is maintained by one person. The security principles are the same.
+**Rate limiting** applies to login attempts (5/second per IP) and to motor commands (configurable, default 20/second per IP) — mostly to keep a stuck client or runaway script from hammering the motors, not as a defense against a serious attacker.
+
+**Everything else that's just good hygiene**: all SQL is parameterized (nothing string-built), API request bodies are validated with Pydantic, secrets live in `.env` and are never committed, and the app only talks HTTPS at all if you put it behind the Cloudflare Tunnel — on your local network it's plain HTTP, same as most home IoT devices.
+
+What this doesn't claim to be: independently audited, resistant to a determined attacker with local network access, or built against a specific compliance framework. If you find something wrong, open an issue.
 
 ---
 

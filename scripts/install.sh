@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh
 #
-# Run once on the Raspberry Pi to set up the venv, systemd services,
+# Run once on the Raspberry Pi/Jetson to set up the venv, systemd services,
 # WiFi provisioning, and Cloudflare Tunnel auto-assignment.
 #
 # Usage: cd ~/robocontrol && bash scripts/install.sh
@@ -19,6 +19,12 @@
 #
 # If this Pi already has a Cloudflare tunnel configured (~/.cloudflared/config.yml),
 # the provisioning step is skipped automatically.
+#
+# No wifi.txt, and no network the device already knows? Every boot, after a
+# short wait, wifi-connect-fallback.service opens its own "RoboCar-Setup"
+# WiFi network with a captive portal to pick the real one — see README →
+# "WiFi setup without a screen". Set PORTAL_SSID / PORTAL_PASSPHRASE in
+# .env to customize it.
 
 set -euo pipefail
 
@@ -120,6 +126,42 @@ sudo systemctl enable wifi-provision.service
 # Run now so WiFi connects immediately if wifi.txt is present
 sudo bash "$REPO_DIR/scripts/wifi_provision.sh" || echo "  (wifi_provision: no wifi.txt or already connected)"
 
+# ── WiFi Connect fallback (captive portal, for when there's no wifi.txt
+#    and no already-saved network) ─────────────────────────────────────
+# https://github.com/balena-os/wifi-connect — pinned version, bump by hand.
+WFC_VERSION="v4.11.84"
+if ! command -v wifi-connect &>/dev/null; then
+    echo "→ Installing wifi-connect $WFC_VERSION"
+    case "$ARCH" in
+        aarch64) WFC_TARGET="aarch64-unknown-linux-gnu"        ;;
+        armv7l)  WFC_TARGET="armv7-unknown-linux-gnueabihf"    ;;
+        *)        echo "  Unknown arch $ARCH — skipping wifi-connect install"
+                  WFC_TARGET="" ;;
+    esac
+    if [ -n "$WFC_TARGET" ]; then
+        WFC_BASE="https://github.com/balena-os/wifi-connect/releases/download/$WFC_VERSION"
+        WFC_TMP=$(mktemp -d)
+        curl -fsSL "$WFC_BASE/wifi-connect-$WFC_TARGET.tar.gz" | tar -xz -C "$WFC_TMP"
+        curl -fsSL "$WFC_BASE/wifi-connect-ui.tar.gz" -o "$WFC_TMP/ui.tar.gz"
+        sudo install -m 755 "$WFC_TMP/wifi-connect" /usr/local/sbin/wifi-connect
+        sudo mkdir -p /usr/local/share/wifi-connect/ui
+        sudo rm -rf /usr/local/share/wifi-connect/ui/*
+        sudo tar -xz -C /usr/local/share/wifi-connect/ui -f "$WFC_TMP/ui.tar.gz"
+        rm -rf "$WFC_TMP"
+        echo "  Installed: $(wifi-connect --version)"
+    fi
+else
+    echo "→ wifi-connect already installed: $(wifi-connect --version)"
+fi
+
+echo "→ Installing wifi-connect-fallback.service"
+sudo cp "$REPO_DIR/scripts/wifi-connect-fallback.service" /etc/systemd/system/wifi-connect-fallback.service
+sudo sed -i "s|/home/pi/robocontrol|$REPO_DIR|g" /etc/systemd/system/wifi-connect-fallback.service
+sudo systemctl daemon-reload
+sudo systemctl enable wifi-connect-fallback.service
+echo "  (not started now — it only matters on a boot with no working network;"
+echo "   you're clearly already connected if you're running this over SSH)"
+
 # ── Cloudflare Tunnel provisioning service ────────────────────────────
 echo "→ Installing cloudflared-provision.service"
 sudo cp "$REPO_DIR/scripts/cloudflared-provision.service" \
@@ -171,7 +213,9 @@ else
 fi
 echo ""
 echo "Useful commands:"
-echo "  sudo systemctl status robocontrol       # app status"
-echo "  sudo systemctl status cloudflared       # tunnel status"
-echo "  journalctl -u robocontrol -f            # app logs"
-echo "  journalctl -u cloudflared-provision -f  # provisioning logs"
+echo "  sudo systemctl status robocontrol           # app status"
+echo "  sudo systemctl status cloudflared           # tunnel status"
+echo "  journalctl -u robocontrol -f                # app logs"
+echo "  journalctl -u cloudflared-provision -f      # provisioning logs"
+echo "  journalctl -u wifi-connect-fallback -f      # captive-portal WiFi setup logs"
+echo "  sudo systemctl start wifi-connect-fallback  # force the WiFi setup portal now"

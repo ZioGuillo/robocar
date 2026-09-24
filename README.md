@@ -100,6 +100,8 @@ USB     → USB webcam         (if using)
 
 **Moving the RRB3 board to a Jetson Nano:** the motor driver in `app/hardware/rrb3_driver.py` talks to the RRB3 over the same BCM pin numbers it uses on a Raspberry Pi, via whichever GPIO backend was detected — no code changes needed. What I can't verify for you is the physical wiring: Jetson Nano's 40-pin header matches a Raspberry Pi's layout closely enough for `Jetson.GPIO`'s BCM-compatible mode to work for most digital I/O, but **check your specific pins against a Jetson pinout diagram with a multimeter before powering the board** — a wrong assumption here is the kind of mistake that damages hardware, not just software.
 
+**WiFi setup** ([below](#wifi-setup-without-a-screen)) depends on NetworkManager being the active network manager. That's the Raspberry Pi OS Bookworm default, matching what this whole hardware layer assumes; JetPack's Ubuntu-based images typically ship it too, but I can't confirm that for your specific Jetson image — check with `systemctl status NetworkManager` before relying on it.
+
 **Testing without any hardware at all:** see [`docker/README.md`](docker/README.md) — `docker compose -f docker/docker-compose.yml up --build` runs the full dashboard with simulated motors/sonar/camera so you can try changes before touching a real board.
 
 ---
@@ -335,10 +337,24 @@ The file is deleted automatically after the first successful connection.
 
 To connect to a different network later, drop a new `wifi.txt` on the boot partition and reboot.
 
+### WiFi setup without a screen
+
+No SD card reader handy, or moving the car to a network you don't have credentials for yet? You don't need to pull the card and edit `wifi.txt` — every boot, if the device has no working network after a short wait, `wifi-connect-fallback.service` opens its own WiFi network (default SSID `RoboCar-Setup`, no passphrase) with a captive portal:
+
+1. Connect your phone or laptop to the `RoboCar-Setup` WiFi network.
+2. Your device should auto-open the setup page (captive portal detection); if not, open any URL and it'll redirect.
+3. Pick the real network from the scanned list and enter its password.
+
+The portal shuts down as soon as it connects, and `robocontrol` becomes reachable at its usual URL on the new network. Set `PORTAL_SSID` / `PORTAL_PASSPHRASE` in `.env` to rename the setup network or protect it with a passphrase (recommended if you're setting up somewhere the WiFi password shouldn't be sent over an open network, even briefly).
+
+This uses [WiFi Connect](https://github.com/balena-os/wifi-connect) (Apache-2.0), installed automatically by `scripts/install.sh`. It only ever *offers* to help — if `wifi.txt` or a previously-saved network already connects, it does nothing and you'll never see it.
+
 ### Service startup order
 
 ```text
 wifi-provision             ← connects WiFi from wifi.txt (skipped if absent)
+        ↓
+wifi-connect-fallback       ← no connection after ~20s? opens the setup portal (skipped once connected)
         ↓
 cloudflared-provision      ← provisions tunnel (skipped if no credentials or already done)
         ↓
@@ -351,6 +367,7 @@ robocontrol                ← app is live at :8000 regardless of tunnel
 
 ```bash
 journalctl -u wifi-provision -n 20          # WiFi provisioning log
+journalctl -u wifi-connect-fallback -n 20   # Captive-portal WiFi setup log
 journalctl -u cloudflared-provision -n 20   # Tunnel provisioning log
 sudo systemctl status cloudflared           # Tunnel runtime status
 journalctl -u robocontrol -f                # App live logs

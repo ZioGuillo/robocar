@@ -1,3 +1,5 @@
+from app.hardware.gpio_compat import GPIO, available as _has_gpio
+
 available = False
 _pan_pwm = None
 _tilt_pwm = None
@@ -7,13 +9,6 @@ _tilt_angle = 90
 MIN_ANGLE = 0
 MAX_ANGLE = 180
 STEP = 15
-
-_has_gpio = False
-try:
-    import RPi.GPIO as GPIO
-    _has_gpio = True
-except Exception:
-    pass
 
 
 def _angle_to_duty(angle: float) -> float:

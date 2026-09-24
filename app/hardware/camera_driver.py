@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 
 import numpy as np
 
@@ -25,8 +26,27 @@ try:
 except Exception:
     pass
 
+# Fallback for boards without picamera2/libcamera (e.g. Jetson Nano, or a
+# Pi with a USB webcam instead of a CSI camera): any V4L2-visible camera
+# via OpenCV. Requires opencv-python-headless — see requirements.txt.
+if not available:
+    try:
+        import cv2
 
-def _capture_loop() -> None:
+        _cv_cam = cv2.VideoCapture(0)
+        if _cv_cam.isOpened():
+            _cv_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            _cv_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            available = True
+            _backend = "opencv"
+        else:
+            _cv_cam.release()
+            _cv_cam = None
+    except Exception:
+        pass
+
+
+def _picamera2_loop() -> None:
     global _latest_frame, _frame_counter, _running
     try:
         _cam.start()
@@ -51,6 +71,38 @@ def _capture_loop() -> None:
             _cam.stop()
         except Exception:
             pass
+
+
+def _opencv_loop() -> None:
+    global _latest_frame, _frame_counter, _running
+    import cv2
+
+    try:
+        while _running:
+            ok, frame = _cv_cam.read()
+            if not ok:
+                time.sleep(0.05)
+                continue
+            ok2, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+            if ok2:
+                with _lock:
+                    _latest_frame = buf.tobytes()
+                    _frame_counter += 1
+    except Exception as exc:
+        _log.error("camera capture loop error: %s", exc)
+        _running = False
+    finally:
+        try:
+            _cv_cam.release()
+        except Exception:
+            pass
+
+
+def _capture_loop() -> None:
+    if _backend == "picamera2":
+        _picamera2_loop()
+    elif _backend == "opencv":
+        _opencv_loop()
 
 
 def start() -> None:

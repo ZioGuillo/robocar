@@ -25,11 +25,13 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CURRENT_USER="$(whoami)"
 ARCH="$(uname -m)"
+BOARD_MODEL="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo unknown)"
 
 echo "=== RoboControl install ==="
-echo "Repo : $REPO_DIR"
-echo "User : $CURRENT_USER"
-echo "Arch : $ARCH"
+echo "Repo  : $REPO_DIR"
+echo "User  : $CURRENT_USER"
+echo "Arch  : $ARCH"
+echo "Board : $BOARD_MODEL"
 echo ""
 
 # ── Python virtual environment ────────────────────────────────────────
@@ -41,23 +43,43 @@ echo "→ Installing Python dependencies"
 pip install --upgrade pip -q
 pip install -r "$REPO_DIR/requirements.txt" -q
 
-# ── picamera2 ─────────────────────────────────────────────────────────
-echo "→ Installing picamera2 system package"
-sudo apt install -y python3-picamera2 --no-install-recommends -q 2>/dev/null || \
-    echo "  (picamera2 not available — CSI camera disabled)"
+# ── GPIO backend — auto-detected from /proc/device-tree/model ─────────
+# app/hardware/gpio_compat.py picks whichever of these is importable at
+# runtime, so installing the right one here is the only board-specific step.
+case "$BOARD_MODEL" in
+    *"Raspberry Pi 5"*)
+        echo "→ Detected Raspberry Pi 5 — installing rpi-lgpio"
+        pip install -q "rpi-lgpio>=0.6"
+        ;;
+    *"Raspberry Pi"*)
+        echo "→ Detected Raspberry Pi (3/4) — installing RPi.GPIO"
+        pip install -q "RPi.GPIO>=0.7.1"
+        ;;
+    *"Jetson"*|*"NVIDIA"*)
+        echo "→ Detected Jetson board — installing Jetson.GPIO"
+        pip install -q "Jetson.GPIO>=2.1.0"
+        echo "  NOTE: verify the RRB3 board's header wiring against a Jetson"
+        echo "  pinout diagram before powering it — see README → Hardware."
+        ;;
+    *)
+        echo "→ Unrecognized board ('$BOARD_MODEL') — skipping GPIO backend install"
+        echo "  Install one manually: pip install RPi.GPIO | rpi-lgpio | Jetson.GPIO"
+        ;;
+esac
 
-# ── rrb3 motor driver ─────────────────────────────────────────────────
-SITE_PACKAGES="$REPO_DIR/venv/lib/$(python3 -c \
-    'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
-if [ ! -f "$SITE_PACKAGES/rrb3.py" ]; then
-    echo "→ Installing rrb3 motor driver"
-    TMP_RRB3=$(mktemp -d)
-    git clone --depth 1 https://github.com/simonmonk/raspirobotboard3.git "$TMP_RRB3" -q
-    cp "$TMP_RRB3/python/rrb3.py" "$SITE_PACKAGES/rrb3.py"
-    rm -rf "$TMP_RRB3"
-else
-    echo "→ rrb3 already installed — skipping"
-fi
+# ── picamera2 (Raspberry Pi CSI camera) ────────────────────────────────
+case "$BOARD_MODEL" in
+    *"Raspberry Pi"*)
+        echo "→ Installing picamera2 system package"
+        sudo apt install -y python3-picamera2 --no-install-recommends -q 2>/dev/null || \
+            echo "  (picamera2 not available — CSI camera disabled)"
+        ;;
+    *)
+        echo "→ Not a Raspberry Pi — skipping picamera2"
+        echo "  If this board has a camera, install the OpenCV fallback instead:"
+        echo "    pip install opencv-python-headless"
+        ;;
+esac
 
 # ── .env ──────────────────────────────────────────────────────────────
 if [ ! -f "$REPO_DIR/.env" ]; then

@@ -1,8 +1,9 @@
 # RoboControl
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=flat&logo=fastapi&logoColor=white)
-![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-3B%2B%2F4-C51A4A?style=flat&logo=raspberrypi&logoColor=white)
+![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-3B%2B%20%7C%204%20%7C%205-C51A4A?style=flat&logo=raspberrypi&logoColor=white)
+![Jetson Nano](https://img.shields.io/badge/Jetson-Nano-76B900?style=flat&logo=nvidia&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 ![Hardware](https://img.shields.io/badge/hardware-RRB3-orange?style=flat)
@@ -13,9 +14,9 @@
 ![Mars Rover Style](https://img.shields.io/badge/Mars%20Rover-Inspired%20Design-B7410E?style=flat&logo=nasa&logoColor=white)
 ![NIST SP 800-53](https://img.shields.io/badge/NIST%20SP%20800--53-Rev%205%20Controls-003087?style=flat&logoColor=white)
 ![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-Hardened-4A154B?style=flat&logoColor=white)
-![Security Audit](https://img.shields.io/badge/Security%20Audit-May%202026-2DC653?style=flat&logoColor=white)
+![Security Audit](https://img.shields.io/badge/Security%20Audit-Sep%202026-2DC653?style=flat&logoColor=white)
 
-Control a Raspberry Pi robot car from any browser — no app, no cables, no soldering beyond the motor board.
+Control a Raspberry Pi (or Jetson Nano) robot car from any browser — no app, no cables, no soldering beyond the motor board.
 
 ---
 
@@ -49,7 +50,7 @@ Control a Raspberry Pi robot car from any browser — no app, no cables, no sold
 
 | Part | Details |
 | ---- | ------- |
-| Raspberry Pi 3B+ or 4 | Any RAM size |
+| Raspberry Pi 3B+ / 4 / 5, or Jetson Nano | Any RAM size. GPIO/camera backend is auto-detected — see [Supported Hardware](#supported-hardware) |
 | RaspiRobot Board V3 (RRB3) | Motor driver HAT — plugs directly onto the GPIO header |
 | HC-SR04 ultrasonic sensor | Plugs into the RRB3 sonar header |
 | 2× DC gear motors + chassis | Any TT-motor compatible pair |
@@ -84,6 +85,21 @@ USB     → USB webcam         (if using)
 
 > Power the Pi from its own micro-USB supply. Sharing power with the motors causes reboots.
 
+### Supported Hardware
+
+`app/hardware/` auto-detects your board at runtime — no config flag to set, the same install works unmodified across boards:
+
+| Board | GPIO backend | Camera backend |
+| ----- | ------------ | --------------- |
+| Raspberry Pi 3B+ / 4 | `RPi.GPIO` | `picamera2` (CSI) |
+| Raspberry Pi 5 | `rpi-lgpio` (drop-in `RPi.GPIO` replacement for the RP1 chip) | `picamera2` (CSI) |
+| Jetson Nano / other Jetson | `Jetson.GPIO` | OpenCV (`opencv-python-headless`) — USB webcam or V4L2 |
+| Anything else (USB webcam, no GPIO) | — (drives disable themselves) | OpenCV |
+
+`scripts/install.sh` reads `/proc/device-tree/model` and installs the matching GPIO package automatically; `app/hardware/gpio_compat.py` then picks up whichever backend is importable. `app/hardware/camera_driver.py` tries `picamera2` first and falls back to OpenCV.
+
+**Moving the RRB3 board to a Jetson Nano:** the motor driver in `app/hardware/rrb3_driver.py` talks to the RRB3 over the same BCM pin numbers it uses on a Raspberry Pi, via whichever GPIO backend was detected — no code changes needed. What I can't verify for you is the physical wiring: Jetson Nano's 40-pin header matches a Raspberry Pi's layout closely enough for `Jetson.GPIO`'s BCM-compatible mode to work for most digital I/O, but **check your specific pins against a Jetson pinout diagram with a multimeter before powering the board** — a wrong assumption here is the kind of mistake that damages hardware, not just software.
+
 ---
 
 ## 2. Install
@@ -103,7 +119,7 @@ ssh pi@<pi-ip-address>
 ### Step 3 — Clone the repo
 
 ```bash
-git clone https://github.com/ZioGuillo/robocontrol.git ~/robocontrol
+git clone https://github.com/ZioGuillo/robocar.git ~/robocontrol
 cd ~/robocontrol
 ```
 
@@ -136,7 +152,8 @@ bash scripts/install.sh
 This will:
 
 - Create the Python virtual environment and install all dependencies
-- Install the camera driver (`picamera2`) if available
+- Detect your board (`/proc/device-tree/model`) and install the matching GPIO backend — see [Supported Hardware](#supported-hardware)
+- Install the camera driver (`picamera2` on a Pi; otherwise nothing — install the OpenCV fallback yourself if this board has a non-CSI camera)
 - Register and start the `robocontrol` systemd service (auto-starts on every boot)
 
 At the end you will see something like:
@@ -210,7 +227,7 @@ Live stats for the current session (resets on restart):
 
 | Metric | Description |
 | ------ | ----------- |
-| Battery | Voltage from the RRB3 ADC |
+| Battery | Whether the motor driver board is detected (the RRB3 has no voltage-sensing circuit, so this isn't a live voltage reading) |
 | Uptime | Time since the server started |
 | Last CMD Latency | Round-trip time of the last motor command |
 | Commands Sent | Total motor commands this session |
@@ -573,7 +590,7 @@ from app import telemetry               # record_command()
 
 ### Running tests
 
-No hardware required — drivers degrade gracefully when GPIO/rrb3/picamera2 are unavailable:
+No hardware required — drivers degrade gracefully when GPIO/camera backends are unavailable:
 
 ```bash
 pytest -v
@@ -581,13 +598,12 @@ pytest -v
 
 ### Swapping hardware
 
-Only `app/hardware/` is hardware-specific. Everything else is agnostic.
+Only `app/hardware/` is hardware-specific. Everything else is agnostic. Raspberry Pi 3/4/5 and Jetson Nano are supported out of the box — see [Supported Hardware](#supported-hardware).
 
-**Alternative boards:**
+**Other boards** (not auto-detected — add a case to `app/hardware/gpio_compat.py`):
 
 | Board | Change |
 | ----- | ------ |
-| NVIDIA Jetson Nano | Swap `RPi.GPIO` → `Jetson.GPIO` |
 | Orange Pi / Banana Pi | Use `OPi.GPIO` or `wiringOP` |
 | BeagleBone Black | Use `Adafruit_BBIO` |
 

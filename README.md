@@ -1,5 +1,7 @@
 # RoboControl
 
+**[Leer en español →](README.es.md)**
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=flat&logo=fastapi&logoColor=white)
 ![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-3B%2B%20%7C%204%20%7C%205-C51A4A?style=flat&logo=raspberrypi&logoColor=white)
@@ -20,6 +22,18 @@ Under the hood it's a FastAPI app with a small hardware abstraction layer, so th
 | Front | Top | Angle |
 | :---: | :---: | :---: |
 | ![Front](images/IMG_5125.JPG) | ![Top](images/IMG_5126.JPG) | ![Angle](images/IMG_5127.JPG) |
+
+---
+
+## In plain language
+
+If you don't write code, here's what this actually is: a small robot car — motors, wheels, a camera, a distance sensor — that you drive from a web page, like you'd use any app. No special software to install. You open a browser, you see what the car sees, and you drive it.
+
+What makes it worth a second look isn't the robot itself — plenty of hobby kits do that. It's *why* it's built the way it is. A NASA rover on Mars can't be joysticked in real time: a radio signal takes between 3 and 22 minutes to cross the distance from Earth to Mars, one way, no matter how good your hardware is — that's the speed of light, not an engineering limitation. So the rover gets one batch of commands a day, executes them mostly on its own, and has to make its own calls about what's a hazard and what isn't. This robot, on the same WiFi network as the phone driving it, has a round-trip of well under a second — but it still has to answer a smaller version of the same question every real remote system faces: *what does it do when it can't reach you?* If the sonar sees an obstacle, it stops itself before a human can react. If it can't find a known WiFi network, it opens its own and asks for help instead of going dark. Different scale, same underlying idea.
+
+You don't need a NASA budget to start thinking this way — you need about $100 in parts and a free weekend. That's really the point of this project: the ideas behind serious remote systems are learnable, not exclusive, and a Raspberry Pi is a perfectly good place to start practicing them.
+
+If you want to see it running before reading any further, jump to [Section 5 (Using the Controller)](#5-using-the-controller) for screenshots, or [`docker/README.md`](docker/README.md) to try the dashboard yourself with no hardware at all.
 
 ---
 

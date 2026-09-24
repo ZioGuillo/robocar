@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     motor_rate_limit: Annotated[int, Field(ge=0)] = 20
     session_secret_key: str = ""
     data_dir: Path = Path.home() / ".local" / "share" / "robocar"
+    # Run without any real GPIO/camera/rrb3 hardware — app/hardware/* drivers
+    # simulate plausible values instead (see docker/README "Local testing
+    # without hardware"). Off by default so a real Pi/Jetson never
+    # accidentally ignores its actual hardware.
+    simulate: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

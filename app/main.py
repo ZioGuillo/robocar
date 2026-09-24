@@ -45,8 +45,9 @@ async def _ready_wiggle():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
-    if servo_driver.available:
-        servo_driver.init(settings.pan_servo_pin, settings.tilt_servo_pin)
+    # init() itself decides `available` (it starts False) — this must run
+    # unconditionally, not be gated on the flag it's responsible for setting.
+    servo_driver.init(settings.pan_servo_pin, settings.tilt_servo_pin)
     camera_driver.start()
     ml_driver.start()
     await _ready_wiggle()

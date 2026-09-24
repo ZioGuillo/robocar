@@ -100,6 +100,8 @@ USB     → USB webcam         (if using)
 
 **Moving the RRB3 board to a Jetson Nano:** the motor driver in `app/hardware/rrb3_driver.py` talks to the RRB3 over the same BCM pin numbers it uses on a Raspberry Pi, via whichever GPIO backend was detected — no code changes needed. What I can't verify for you is the physical wiring: Jetson Nano's 40-pin header matches a Raspberry Pi's layout closely enough for `Jetson.GPIO`'s BCM-compatible mode to work for most digital I/O, but **check your specific pins against a Jetson pinout diagram with a multimeter before powering the board** — a wrong assumption here is the kind of mistake that damages hardware, not just software.
 
+**Testing without any hardware at all:** see [`docker/README.md`](docker/README.md) — `docker compose -f docker/docker-compose.yml up --build` runs the full dashboard with simulated motors/sonar/camera so you can try changes before touching a real board.
+
 ---
 
 ## 2. Install

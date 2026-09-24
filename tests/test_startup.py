@@ -40,3 +40,18 @@ def test_wiggle_skipped_when_hardware_unavailable():
         with TestClient(app):
             pass
     mock_motors.assert_not_called()
+
+
+def test_servo_init_runs_on_startup_even_though_available_starts_false():
+    """Regression test: servo_driver.available starts False and is only set
+    True *inside* init() on success, so gating the init() call on `available`
+    (as main.py used to do) meant init() could never run — the servo would
+    never actually initialize on real hardware."""
+    with patch("app.hardware.rrb3_driver.available", False), \
+         patch("app.hardware.servo_driver.available", False), \
+         patch("app.hardware.servo_driver.init") as mock_init:
+        from fastapi.testclient import TestClient
+        from app.main import app
+        with TestClient(app):
+            pass
+    mock_init.assert_called_once()

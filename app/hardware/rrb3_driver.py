@@ -15,13 +15,16 @@ with a multimeter/pinout diagram before powering it — the two boards'
 but that's not a substitute for physically checking your wiring.
 """
 import logging
+import math
 import time
 
+from app.config import settings
 from app.hardware.gpio_compat import GPIO, available as _gpio_available
 
 _log = logging.getLogger(__name__)
 
 available = False
+simulated = False
 
 # BCM pin numbers — from raspirobotboard3/python/rrb3.py
 _LEFT_PWM_PIN, _LEFT_1_PIN, _LEFT_2_PIN = 24, 17, 4
@@ -39,7 +42,13 @@ _right_pwm = None
 _old_left_dir = -1
 _old_right_dir = -1
 
-if _gpio_available:
+if settings.simulate:
+    # No GPIO at all — used for `docker/` / local testing of the dashboard
+    # and telemetry without real hardware. See README "Local testing
+    # without hardware".
+    available = True
+    simulated = True
+elif _gpio_available:
     try:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
@@ -76,6 +85,9 @@ def set_motors(speed1: float, dir1: int, speed2: float, dir2: int) -> None:
     global _old_left_dir, _old_right_dir
     if not available:
         raise RuntimeError("rrb3 not available")
+    if simulated:
+        _old_left_dir, _old_right_dir = dir1, dir2
+        return
     if _old_left_dir != dir1 or _old_right_dir != dir2:
         _set_driver_pins(0, 0, 0, 0)  # stop between sudden direction changes
         time.sleep(_MOTOR_DELAY)
@@ -83,11 +95,19 @@ def set_motors(speed1: float, dir1: int, speed2: float, dir2: int) -> None:
     _old_left_dir, _old_right_dir = dir1, dir2
 
 
+def _simulated_distance_cm() -> float:
+    """Deterministic 15-150cm sine sweep (~10s period) — enough movement to
+    exercise obstacle-avoidance logic and telemetry charts without hardware."""
+    return 82.5 + 67.5 * math.sin(time.monotonic() * (2 * math.pi / 10.0))
+
+
 def get_distance() -> float:
     """Returns sonar distance in cm. Returns inf when hardware unavailable
     or the echo pulse times out."""
     if not available:
         return float("inf")
+    if simulated:
+        return _simulated_distance_cm()
     try:
         GPIO.output(_TRIGGER_PIN, True)
         time.sleep(0.0001)

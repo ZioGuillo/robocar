@@ -21,7 +21,7 @@ Under the hood it's a FastAPI app with a small hardware abstraction layer, so th
 
 | Front | Top | Angle |
 | :---: | :---: | :---: |
-| ![Front](images/IMG_5125.JPG) | ![Top](images/IMG_5126.JPG) | ![Angle](images/IMG_5127.JPG) |
+| ![Front](images/robot_front.jpg) | ![Top](images/robot_top.jpg) | ![Angle](images/robot_angle.jpg) |
 
 ---
 
@@ -232,7 +232,7 @@ Default credentials:
 
 ### Drive tab
 
-![Drive tab](images/IMG_dash.png)
+![Drive tab](images/ui_dash.png)
 
 | Control | What it does |
 | ------- | ------------ |
@@ -244,7 +244,7 @@ When the sonar detects an obstacle closer than 20 cm, the car stops automaticall
 
 ### Camera tab
 
-![Camera tab](images/IMG_camera.png)
+![Camera tab](images/ui_camera.png)
 
 Full-size live stream. The 3×3 grid below it nudges the pan/tilt servos; the centre button re-centres both.
 
@@ -252,7 +252,7 @@ Detection order: **CSI camera → USB webcam → `CAMERA_STREAM_URL` → placeho
 
 ### Missions tab
 
-![Missions tab](images/IMG_missions.png)
+![Missions tab](images/ui_missions.png)
 
 | Mission | Description |
 | ------- | ----------- |
@@ -264,7 +264,7 @@ All missions are currently **coming soon**.
 
 ### Telemetry tab
 
-![Telemetry tab](images/IMG_telemetry.png)
+![Telemetry tab](images/ui_telemetry.png)
 
 Live stats for the current session (resets on restart):
 

@@ -22,6 +22,14 @@ _MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 _MODEL_PATH = _MODELS_DIR / "efficientdet_lite0.tflite"
 _LABELS_PATH = _MODELS_DIR / "coco_labels.txt"
 
+# Second, parallel single-class detector — trained separately (see
+# scripts/train_lego_detector.ipynb), runs alongside the COCO model rather
+# than being merged into it, so the person/animal/object detection above
+# is untouched regardless of whether this one is present.
+_LEGO_MODEL_PATH = _MODELS_DIR / "lego_minifigure.tflite"
+_lego_interpreter = None
+lego_available = False
+
 model_found = _MODEL_PATH.exists() and _LABELS_PATH.exists()
 
 try:
@@ -38,6 +46,18 @@ try:
         _interpreter.allocate_tensors()
         _labels = _LABELS_PATH.read_text().strip().splitlines()
         available = True
+
+    if _LEGO_MODEL_PATH.exists():
+        try:
+            _lego_interpreter = tflite.Interpreter(model_path=str(_LEGO_MODEL_PATH))
+            _lego_interpreter.allocate_tensors()
+            lego_available = True
+        except Exception as exc:
+            _log.debug("lego detector unavailable: %s", exc)
+
+    # `available` gates whether the detection loop runs at all — either
+    # detector being ready is enough, each degrades independently below.
+    available = available or lego_available
 except Exception as exc:
     _log.debug("ml_driver unavailable: %s", exc)
 
@@ -89,6 +109,73 @@ def _run_inference(frame: bytes) -> list[dict]:
     return results
 
 
+def _nms(boxes_xyxy, scores, iou_threshold: float) -> list[int]:
+    """Greedy single-class non-max suppression. boxes_xyxy: (N,4) array of
+    [x1,y1,x2,y2]; returns indices to keep, highest score first."""
+    order = scores.argsort()[::-1]
+    areas = (boxes_xyxy[:, 2] - boxes_xyxy[:, 0]) * (boxes_xyxy[:, 3] - boxes_xyxy[:, 1])
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(int(i))
+        if order.size == 1:
+            break
+        rest = order[1:]
+        xx1 = np.maximum(boxes_xyxy[i, 0], boxes_xyxy[rest, 0])
+        yy1 = np.maximum(boxes_xyxy[i, 1], boxes_xyxy[rest, 1])
+        xx2 = np.minimum(boxes_xyxy[i, 2], boxes_xyxy[rest, 2])
+        yy2 = np.minimum(boxes_xyxy[i, 3], boxes_xyxy[rest, 3])
+        inter = np.maximum(0, xx2 - xx1) * np.maximum(0, yy2 - yy1)
+        iou = inter / (areas[i] + areas[rest] - inter + 1e-9)
+        order = rest[iou <= iou_threshold]
+    return keep
+
+
+def _run_lego_inference(frame: bytes) -> list[dict]:
+    """Decodes the custom single-class YOLOv8 lego_minifigure.tflite model
+    — a raw (NMS-less) export, unlike the COCO model's built-in
+    TFLite_Detection_PostProcess op, so thresholding/NMS happen here.
+    Input is channel-first (NCHW) float32 0-1, per this model's own export
+    (see scripts/train_lego_detector.ipynb) — not the NHWC uint8 the COCO
+    model above uses, so this does not share _run_inference's preprocessing.
+    """
+    if _lego_interpreter is None:
+        return []
+
+    input_details = _lego_interpreter.get_input_details()
+    output_details = _lego_interpreter.get_output_details()
+
+    _, _, in_h, in_w = input_details[0]["shape"]
+    img = Image.open(io.BytesIO(frame)).convert("RGB").resize((in_w, in_h))
+    arr = np.array(img, dtype=np.float32) / 255.0
+    arr = np.transpose(arr, (2, 0, 1))[np.newaxis, :]  # HWC -> NCHW
+
+    _lego_interpreter.set_tensor(input_details[0]["index"], arr)
+    _lego_interpreter.invoke()
+
+    raw = _lego_interpreter.get_tensor(output_details[0]["index"])[0]  # [5, N]
+    scores = raw[4]
+    mask = scores >= 0.4
+    if not mask.any():
+        return []
+
+    cx, cy, w, h = raw[0, mask], raw[1, mask], raw[2, mask], raw[3, mask]
+    scores = scores[mask]
+    boxes_xyxy = np.stack([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2], axis=1)
+    boxes_xyxy = np.clip(boxes_xyxy, 0.0, 1.0)
+
+    keep = _nms(boxes_xyxy, scores, iou_threshold=0.45)
+    results = []
+    for i in keep:
+        x1, y1, x2, y2 = boxes_xyxy[i]
+        results.append({
+            "label": "lego_minifigure",
+            "score": round(float(scores[i]), 2),
+            "box": [float(y1), float(x1), float(y2), float(x2)],  # match _run_inference's [y1,x1,y2,x2]
+        })
+    return results
+
+
 def _detection_loop() -> None:
     global _detections, _running
 
@@ -103,7 +190,7 @@ def _detection_loop() -> None:
             time.sleep(0.5)
             continue
         try:
-            found = _run_inference(frame)
+            found = _run_inference(frame) + _run_lego_inference(frame)
             with _lock:
                 _detections = found
         except Exception as exc:

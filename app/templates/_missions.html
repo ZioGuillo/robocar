@@ -1,6 +1,6 @@
 <h2>Missions</h2>
 <p style="color: var(--pico-muted-color); margin-bottom: 1.5rem;">
-  Autonomous mission modes. These features are planned for a future release.
+  Autonomous mission modes. Auto-Drive is live; the others are planned for a future release.
 </p>
 
 <div class="mission-cards">
@@ -23,10 +23,10 @@
 
   <!-- Auto-Drive -->
   <div class="mission-card">
-    <span class="coming-soon">Coming soon</span>
     <h3>🤖 Auto-Drive</h3>
     <p>Fully autonomous driving mode. The car will navigate its environment independently without manual input.</p>
-    <button disabled onclick="autoDriveClick()">Enable Auto-Drive</button>
+    <button class="autodrive-btn" onclick="autoDriveClick()">🤖 Auto-Drive &nbsp; OFF</button>
+    <p class="autodrive-status" style="color: var(--pico-muted-color); margin-top: 0.5rem;"></p>
   </div>
 
 </div>

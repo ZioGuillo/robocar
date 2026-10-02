@@ -250,8 +250,63 @@ function stopAction() {
   sendMotor('stop');
 }
 
+// ── Auto-drive ─────────────────────────────────────────────────
+var autoDriveRunning = false;
+var _autoDrivePoll = null;
+
+function _autoDriveButtons() {
+  return document.querySelectorAll('.autodrive-btn');
+}
+
+function _renderAutoDriveState(running, action, distanceCm) {
+  autoDriveRunning = running;
+  _autoDriveButtons().forEach(function(btn) {
+    btn.textContent = running ? '🤖 Auto-Drive   ON' : '🤖 Auto-Drive   OFF';
+    btn.classList.toggle('active', running);
+  });
+  var statusText = '';
+  if (running) {
+    if (action === 'avoiding') {
+      statusText = 'avoiding obstacle (' + distanceCm + ' cm)';
+    } else if (action === 'forward') {
+      statusText = distanceCm != null ? 'driving forward (' + distanceCm + ' cm clear)' : 'driving forward';
+    } else {
+      statusText = 'starting…';
+    }
+  }
+  document.querySelectorAll('.autodrive-status').forEach(function(el) {
+    el.textContent = statusText;
+  });
+}
+
+function _pollAutoDriveStatus() {
+  fetch('/api/motors/auto/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _renderAutoDriveState(d.running, d.action, d.distance_cm);
+      if (!d.running && _autoDrivePoll) {
+        clearInterval(_autoDrivePoll);
+        _autoDrivePoll = null;
+      }
+    })
+    .catch(function() {});
+}
+
 function autoDriveClick() {
-  notify('Auto-drive is not available yet', 'info');
+  var endpoint = autoDriveRunning ? '/api/motors/auto/stop' : '/api/motors/auto/start';
+  fetch(endpoint, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.detail && !data.detail.ok) {
+        notify(data.detail.message || 'Auto-drive error', 'warning');
+        return;
+      }
+      _renderAutoDriveState(data.running, null, null);
+      if (data.running && !_autoDrivePoll) {
+        _autoDrivePoll = setInterval(_pollAutoDriveStatus, 500);
+      }
+    })
+    .catch(function() { notify('Connection lost', 'alert'); });
 }
 
 // ── Camera pan/tilt ────────────────────────────────────────────
@@ -357,6 +412,16 @@ function pollTelemetry() {
 
 setInterval(pollTelemetry, 5000);
 pollTelemetry();
+
+// Pick up auto-drive state on page load (e.g. after a refresh while it's
+// still running) and resume the fast status poll if so.
+fetch('/api/motors/auto/status')
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    _renderAutoDriveState(d.running, d.action, d.distance_cm);
+    if (d.running) _autoDrivePoll = setInterval(_pollAutoDriveStatus, 500);
+  })
+  .catch(function() {});
 
 // ── Mission stubs ──────────────────────────────────────────────
 function sendMission(action) {

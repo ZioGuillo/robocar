@@ -7,6 +7,97 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <style>
+    /* ── Mission control theme ──
+       Single accent (#639bff) matches the login page exactly. Semantic
+       status colors (ok/warn/danger) stay separate from the accent since
+       they carry real meaning (battery/connection state), not just style.
+       Overriding Pico's own CSS variables re-themes every component that
+       already builds on them (buttons, forms, switches, cards, borders)
+       without needing to restyle each one by hand. */
+    html[data-theme="dark"] {
+      --accent: #639bff;
+      --bg-deep: #02040a;
+      --bg-glow: #0d1a33;
+      --ok: #2dc653;
+      --warn: #f9a825;
+      --danger: #e53935;
+      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+      --pico-background-color: var(--bg-deep);
+      --pico-color: #e8eeff;
+      --pico-muted-color: #8a97bd;
+      --pico-muted-border-color: rgba(255,255,255,0.08);
+      --pico-border-radius: 0.9rem;
+      --pico-card-background-color: rgba(255,255,255,0.03);
+      --pico-card-border-color: rgba(255,255,255,0.08);
+      --pico-card-sectioning-background-color: rgba(255,255,255,0.03);
+
+      --pico-primary: var(--accent);
+      --pico-primary-background: var(--accent);
+      --pico-primary-border: var(--accent);
+      --pico-primary-underline: rgba(99,155,255,0.5);
+      --pico-primary-hover: #86b3ff;
+      --pico-primary-hover-background: #7eaeff;
+      --pico-primary-hover-border: #7eaeff;
+      --pico-primary-hover-underline: rgba(99,155,255,0.7);
+      --pico-primary-focus: rgba(99,155,255,0.35);
+      --pico-primary-inverse: var(--bg-deep);
+
+      --pico-secondary: #9fb3d6;
+      --pico-secondary-background: rgba(99,155,255,0.1);
+      --pico-secondary-border: rgba(99,155,255,0.25);
+      --pico-secondary-hover: #c3d3ef;
+      --pico-secondary-hover-background: rgba(99,155,255,0.16);
+      --pico-secondary-hover-border: rgba(99,155,255,0.4);
+      --pico-secondary-focus: rgba(99,155,255,0.25);
+      --pico-secondary-inverse: var(--bg-deep);
+
+      --pico-del-color: var(--danger);
+
+      --pico-form-element-background-color: rgba(255,255,255,0.04);
+      --pico-form-element-border-color: rgba(255,255,255,0.1);
+      --pico-form-element-color: #e8eeff;
+      --pico-form-element-placeholder-color: #5c6a8f;
+      --pico-form-element-focus-color: var(--accent);
+      --pico-form-element-active-border-color: var(--accent);
+      --pico-form-element-active-background-color: rgba(255,255,255,0.06);
+
+      --pico-switch-background-color: rgba(255,255,255,0.14);
+      --pico-switch-checked-background-color: var(--accent);
+      --pico-switch-color: #fff;
+
+      --pico-range-border-color: rgba(99,155,255,0.25);
+      --pico-range-active-border-color: var(--accent);
+      --pico-range-thumb-color: var(--accent);
+      --pico-range-thumb-border-color: var(--accent);
+      --pico-range-thumb-active-color: #86b3ff;
+    }
+
+    /* Deep-space gradient + a static (non-animated) scatter of stars —
+       same visual family as the login page's canvas, toned down so it
+       doesn't compete with the live camera feed/telemetry while driving. */
+    body {
+      background-color: var(--bg-deep);
+      background-image:
+        radial-gradient(ellipse 900px 700px at 85% -10%, var(--bg-glow) 0%, transparent 60%),
+        radial-gradient(1px 1px at 8% 15%, rgba(255,255,255,0.6) 50%, transparent 52%),
+        radial-gradient(1px 1px at 22% 68%, rgba(255,255,255,0.4) 50%, transparent 52%),
+        radial-gradient(1.5px 1.5px at 42% 32%, rgba(255,255,255,0.5) 50%, transparent 52%),
+        radial-gradient(1px 1px at 63% 78%, rgba(255,255,255,0.35) 50%, transparent 52%),
+        radial-gradient(1.5px 1.5px at 78% 22%, rgba(255,255,255,0.45) 50%, transparent 52%),
+        radial-gradient(1px 1px at 91% 58%, rgba(255,255,255,0.3) 50%, transparent 52%),
+        radial-gradient(1px 1px at 35% 90%, rgba(255,255,255,0.3) 50%, transparent 52%);
+      background-repeat: no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat;
+      background-size: 100% 100%, 380px 380px, 380px 380px, 380px 380px, 380px 380px, 380px 380px, 380px 380px, 380px 380px;
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(99,155,255,0.25); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(99,155,255,0.4); }
+
     /* ── Status dot ── */
     .status-dot {
       width: 14px; height: 14px;
@@ -78,7 +169,7 @@
     }
     .notification {
       padding: 0.7rem 1rem;
-      border-radius: 8px; margin-bottom: 0.5rem;
+      border-radius: 14px; margin-bottom: 0.5rem;
       display: flex; align-items: center;
       justify-content: space-between; gap: 1rem;
       animation: slideIn 0.2s ease;
@@ -109,10 +200,16 @@
       width: 72px; height: 72px;
       font-size: 1.5rem;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 8px; cursor: pointer;
+      border-radius: 18px; cursor: pointer;
       touch-action: none;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--accent);
+      transition: background 0.15s, border-color 0.15s;
     }
-    .dpad-btn.stop-btn { background: var(--pico-del-color); }
+    .dpad-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
+    .dpad-btn.stop-btn { background: var(--pico-del-color); border-color: var(--pico-del-color); color: #fff; }
+    .dpad-btn.stop-btn:hover { background: #ff5048; }
 
     /* ── Drive layout ── */
     .drive-layout {
@@ -128,9 +225,9 @@
 
     /* ── PiP camera ── */
     .pip-container {
-      border-radius: 10px;
+      border-radius: 18px;
       overflow: hidden;
-      background: #111;
+      background: #05070d;
       border: 1px solid var(--pico-muted-border-color);
       position: relative;
     }
@@ -158,6 +255,7 @@
       margin-top: 0.75rem;
     }
     .autodrive-section small { color: var(--pico-muted-color); }
+    .autodrive-btn.active { background: #2dc653; border-color: #2dc653; color: #06240f; }
 
     /* ── Pan/tilt grid ── */
     .pantilt-grid {
@@ -172,23 +270,32 @@
       width: 60px; height: 60px;
       font-size: 1.3rem;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 8px; cursor: pointer;
+      border-radius: 16px; cursor: pointer;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--accent);
+      transition: background 0.15s, border-color 0.15s;
     }
-    .pt-btn.center-btn { background: var(--pico-secondary-background); }
+    .pt-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
+    .pt-btn.center-btn {
+      background: var(--pico-secondary-background);
+      border-color: var(--pico-secondary-border);
+      color: var(--pico-secondary);
+    }
 
     /* ── Camera tab ── */
     .camera-stream { position: relative; }
     .camera-stream iframe,
     .camera-stream img {
       width: 100%; height: 340px; border: none;
-      border-radius: 10px; background: #111; object-fit: contain; display: block;
+      border-radius: 18px; background: #05070d; object-fit: contain; display: block;
     }
     @media (min-width: 768px) {
       .camera-stream iframe,
       .camera-stream img { height: 480px; }
     }
     .camera-placeholder {
-      height: 340px; background: #111; border-radius: 10px;
+      height: 340px; background: #05070d; border-radius: 18px;
       display: flex; align-items: center; justify-content: center;
       color: var(--pico-muted-color); border: 1px solid var(--pico-muted-border-color);
     }
@@ -229,17 +336,23 @@
     }
     .mission-card {
       border: 1px solid var(--pico-muted-border-color);
-      border-radius: 12px; padding: 1.25rem;
+      border-radius: 18px; padding: 1.25rem;
+      background: rgba(255,255,255,0.025);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     }
     .mission-card h3 { margin-bottom: 0.5rem; }
     .mission-card p  { color: var(--pico-muted-color); font-size: 0.9rem; }
     .coming-soon {
       display: inline-block;
-      font-size: 0.75rem;
-      background: var(--pico-muted-border-color);
+      font-size: 0.72rem;
+      background: transparent;
+      border: 1px solid var(--pico-muted-border-color);
+      color: var(--pico-muted-color);
       padding: 0.15rem 0.5rem;
       border-radius: 20px;
       margin-bottom: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     /* ── Settings ── */
@@ -268,7 +381,7 @@
       padding: 0; margin: 0;
       display: flex; align-items: center; justify-content: center;
       border: 1px solid var(--pico-muted-border-color);
-      border-radius: 6px; cursor: pointer;
+      border-radius: 10px; cursor: pointer;
       background: none;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
@@ -284,7 +397,7 @@
       position: absolute; right: 0; top: calc(100% + 6px);
       background: var(--pico-card-background-color);
       border: 1px solid var(--pico-muted-border-color);
-      border-radius: 10px; padding: 0.4rem 0.5rem;
+      border-radius: 18px; padding: 0.4rem 0.5rem;
       gap: 0.3rem; z-index: 200;
       flex-direction: row;
       box-shadow: 0 4px 16px rgba(0,0,0,0.4);
@@ -314,7 +427,9 @@
     }
     .telemetry-card {
       border: 1px solid var(--pico-muted-border-color);
-      border-radius: 12px; padding: 1rem 1.1rem;
+      border-radius: 18px; padding: 1rem 1.1rem;
+      background: rgba(255,255,255,0.025);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     }
     .tel-label {
       font-size: 0.78rem;
@@ -324,8 +439,10 @@
       margin-bottom: 0.35rem;
     }
     .tel-value {
-      font-size: 1.6rem;
-      font-weight: 700;
+      font-size: 1.75rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -0.02em;
       line-height: 1.1;
       margin-bottom: 0.3rem;
     }

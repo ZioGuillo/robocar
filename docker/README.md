@@ -42,6 +42,25 @@ docker run --rm -p 8000:8000 robocar-sim
 Then open **http://localhost:8000** — log in with `admin` / `admin` (you'll
 be asked to change it on first login, same as on real hardware).
 
+## Running this on a real board (hardwareless-except-camera)
+
+`SIMULATE=true` fakes motors/sonar/servos, but a real camera plugged into
+the board is tried first regardless — pass it through and the stream uses
+it instead of the synthetic test pattern:
+
+```bash
+docker run -d -p 8000:8000 \
+  -v robocar-sim-data:/data \
+  -e BOARD_MODEL="$(tr -d '\0' < /proc/device-tree/model)" \
+  --device=/dev/video0:/dev/video0 \
+  robocar-sim
+```
+
+`BOARD_MODEL` is read from the host because a container's own `/proc` can't
+see the host's `/proc/device-tree/model` even when bind-mounted — it's only
+used for display (e.g. the Telemetry tab's "Jetson Battery" label), never
+for picking a hardware backend.
+
 ## What this does *not* catch
 
 This is a software simulation of the hardware boundary, not the hardware

@@ -17,9 +17,6 @@ pytest-asyncio>=0.23.0
 #
 # picamera2 handles CSI cameras via libcamera on a Raspberry Pi — system package:
 #   sudo apt install -y python3-picamera2
-# On boards without picamera2 (Jetson Nano, or a USB webcam on a Pi), camera_driver
-# falls back to any V4L2 camera via OpenCV:
-#   pip install opencv-python-headless
 Pillow>=10.0.0
 psutil>=5.9.0
 prometheus-client>=0.20.0
@@ -28,3 +25,9 @@ numpy>=1.26.0
 # board/Python combo we support, but ml_driver.py still degrades gracefully
 # (available = False) if the import fails or the model file is missing.
 ai-edge-litert>=2.1.0
+# USB/V4L2 camera fallback (app/hardware/camera_driver.py) — picamera2 covers
+# Raspberry Pi CSI cameras but isn't installed here (system package, see
+# scripts/install.sh); this covers any board with a USB webcam instead,
+# including boards with no camera at all (falls back to simulated frames
+# when SIMULATE=true, or available=False otherwise).
+opencv-python-headless>=4.9.0

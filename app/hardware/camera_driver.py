@@ -18,43 +18,49 @@ _frame_counter: int = 0
 _running = False
 _backend: str = "none"
 
-if settings.simulate:
-    # Synthetic frames — used for `docker/` / local testing of the camera
-    # tab and ML-overlay UI without real hardware. See README "Local
-    # testing without hardware".
-    available = True
-    _backend = "simulated"
-else:
-    try:
-        from picamera2 import Picamera2
+# Real camera hardware is tried first regardless of SIMULATE — SIMULATE
+# fakes drivers that would otherwise need real motor/sonar/servo hardware,
+# but a camera plugged in over USB/CSI is just as usable in a SIMULATE
+# session (e.g. hardwareless mission testing with a real camera attached),
+# so it's never ignored outright. SIMULATE only controls the synthetic
+# fallback when no real camera is found.
+try:
+    from picamera2 import Picamera2
 
-        _cam = Picamera2()
-        _cam.configure(_cam.create_video_configuration(
-            main={"size": (640, 480), "format": "MJPEG"},
-        ))
-        available = True
-        _backend = "picamera2"
+    _cam = Picamera2()
+    _cam.configure(_cam.create_video_configuration(
+        main={"size": (640, 480), "format": "MJPEG"},
+    ))
+    available = True
+    _backend = "picamera2"
+except Exception:
+    pass
+
+# Fallback for boards without picamera2/libcamera (e.g. Jetson Nano, or a
+# Pi with a USB webcam instead of a CSI camera): any V4L2-visible camera
+# via OpenCV. Requires opencv-python-headless — see requirements.txt.
+if not available:
+    try:
+        import cv2
+
+        _cv_cam = cv2.VideoCapture(0)
+        if _cv_cam.isOpened():
+            _cv_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            _cv_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            available = True
+            _backend = "opencv"
+        else:
+            _cv_cam.release()
+            _cv_cam = None
     except Exception:
         pass
 
-    # Fallback for boards without picamera2/libcamera (e.g. Jetson Nano, or a
-    # Pi with a USB webcam instead of a CSI camera): any V4L2-visible camera
-    # via OpenCV. Requires opencv-python-headless — see requirements.txt.
-    if not available:
-        try:
-            import cv2
-
-            _cv_cam = cv2.VideoCapture(0)
-            if _cv_cam.isOpened():
-                _cv_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                _cv_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                available = True
-                _backend = "opencv"
-            else:
-                _cv_cam.release()
-                _cv_cam = None
-        except Exception:
-            pass
+if not available and settings.simulate:
+    # No real camera found — synthetic frames so the camera tab and
+    # ML-overlay UI are still usable without hardware. See README "Local
+    # testing without hardware".
+    available = True
+    _backend = "simulated"
 
 
 def _picamera2_loop() -> None:

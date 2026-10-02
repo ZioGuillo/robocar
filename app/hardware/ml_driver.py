@@ -18,8 +18,9 @@ _lock = threading.Lock()
 _detections: list[dict] = []
 _running = False
 
-_MODEL_PATH = Path("data/models/mobilenet_ssd_v1.tflite")
-_LABELS_PATH = Path("data/models/coco_labels.txt")
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+_MODEL_PATH = _MODELS_DIR / "efficientdet_lite0.tflite"
+_LABELS_PATH = _MODELS_DIR / "coco_labels.txt"
 
 model_found = _MODEL_PATH.exists() and _LABELS_PATH.exists()
 
@@ -45,11 +46,12 @@ def _run_inference(frame: bytes) -> list[dict]:
     if _interpreter is None:
         return []
 
-    img = Image.open(io.BytesIO(frame)).convert("RGB").resize((300, 300))
-    arr = np.array(img, dtype=np.uint8)[np.newaxis, :]
-
     input_details = _interpreter.get_input_details()
     output_details = _interpreter.get_output_details()
+
+    _, in_h, in_w, _ = input_details[0]["shape"]
+    img = Image.open(io.BytesIO(frame)).convert("RGB").resize((in_w, in_h))
+    arr = np.array(img, dtype=np.uint8)[np.newaxis, :]
 
     _interpreter.set_tensor(input_details[0]["index"], arr)
     _interpreter.invoke()
@@ -64,8 +66,21 @@ def _run_inference(frame: bytes) -> list[dict]:
         score = float(scores[i])
         if score < 0.5:
             continue
-        class_id = int(classes[i])
-        label = _labels[class_id] if class_id < len(_labels) else str(class_id)
+        # The TFLite_Detection_PostProcess op's class ids are background-
+        # exclusive (0 == the first real category), but _labels[0] is the
+        # "???" background placeholder from the standard 91-entry COCO
+        # label map — so the real label is one index further in, e.g.
+        # class_id 0 -> _labels[1] == "person". Skipping this +1 silently
+        # mislabeled every detection (verified: cats detected as "bird",
+        # people as "???").
+        class_id = int(classes[i]) + 1
+        if class_id >= len(_labels):
+            continue
+        label = _labels[class_id]
+        if label == "???":
+            # One of COCO's 11 retired/placeholder category slots — never
+            # a meaningful detection, so not worth showing.
+            continue
         results.append({
             "label": label,
             "score": round(score, 2),

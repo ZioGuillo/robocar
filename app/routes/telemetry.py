@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app import telemetry
-from app.hardware import rrb3_driver as driver
+from app.hardware import board_info, rrb3_driver as driver
 
 router = APIRouter(prefix="/api/telemetry")
 
@@ -11,4 +11,6 @@ def get_telemetry():
     data["battery_v"] = driver.get_battery_voltage()
     data["battery_motor_ok"] = driver.available
     data["battery_pi_ok"] = True
+    data["board_battery_label"] = board_info.battery_label
+    data["board_battery_sub"] = board_info.battery_sub
     return data

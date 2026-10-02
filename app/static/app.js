@@ -318,6 +318,12 @@ function pollTelemetry() {
       if (motorBatEl) motorBatEl.innerHTML = batteryLabel(d.battery_motor_ok);
       if (piBatEl) piBatEl.innerHTML = batteryLabel(d.battery_pi_ok);
 
+      // Board battery label — reflects the actual detected device (Pi/Jetson/etc.)
+      var boardLabelEl = document.getElementById('tel-battery-board-label');
+      var boardSubEl = document.getElementById('tel-battery-board-sub');
+      if (boardLabelEl && d.board_battery_label) boardLabelEl.textContent = d.board_battery_label;
+      if (boardSubEl && d.board_battery_sub) boardSubEl.textContent = d.board_battery_sub;
+
       // Latency
       var latEl = document.getElementById('tel-latency');
       var latBar = document.getElementById('tel-latency-bar');

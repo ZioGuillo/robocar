@@ -111,7 +111,12 @@ def _run_inference(frame: bytes) -> list[dict]:
 
 def _nms(boxes_xyxy, scores, iou_threshold: float) -> list[int]:
     """Greedy single-class non-max suppression. boxes_xyxy: (N,4) array of
-    [x1,y1,x2,y2]; returns indices to keep, highest score first."""
+    [x1,y1,x2,y2]; returns indices to keep, highest score first.
+
+    Suppresses on max(IoU, overlap-over-smaller-area), not plain IoU alone —
+    a large low-quality box that fully *contains* a smaller good one has low
+    IoU (union is dominated by the large box) but is still a duplicate of
+    the same object, and plain-IoU NMS lets both through."""
     order = scores.argsort()[::-1]
     areas = (boxes_xyxy[:, 2] - boxes_xyxy[:, 0]) * (boxes_xyxy[:, 3] - boxes_xyxy[:, 1])
     keep = []
@@ -127,7 +132,8 @@ def _nms(boxes_xyxy, scores, iou_threshold: float) -> list[int]:
         yy2 = np.minimum(boxes_xyxy[i, 3], boxes_xyxy[rest, 3])
         inter = np.maximum(0, xx2 - xx1) * np.maximum(0, yy2 - yy1)
         iou = inter / (areas[i] + areas[rest] - inter + 1e-9)
-        order = rest[iou <= iou_threshold]
+        overlap_ratio = inter / (np.minimum(areas[i], areas[rest]) + 1e-9)
+        order = rest[np.maximum(iou, overlap_ratio) <= iou_threshold]
     return keep
 
 
@@ -155,7 +161,12 @@ def _run_lego_inference(frame: bytes) -> list[dict]:
 
     raw = _lego_interpreter.get_tensor(output_details[0]["index"])[0]  # [5, N]
     scores = raw[4]
-    mask = scores >= 0.4
+    # Trained on 481 clean, single-figure product photos — a busy real
+    # room scene is out of distribution, and the model occasionally fires
+    # a high-confidence box spanning most of the frame. A minifigure held
+    # up to the camera realistically doesn't fill more than ~40% of it, so
+    # drop candidates bigger than that before NMS even sees them.
+    mask = (scores >= 0.4) & (raw[2] * raw[3] <= 0.4)
     if not mask.any():
         return []
 

@@ -166,7 +166,7 @@ def _run_lego_inference(frame: bytes) -> list[dict]:
     # a high-confidence box spanning most of the frame. A minifigure held
     # up to the camera realistically doesn't fill more than ~40% of it, so
     # drop candidates bigger than that before NMS even sees them.
-    mask = (scores >= 0.4) & (raw[2] * raw[3] <= 0.4)
+    mask = (scores >= 0.3) & (raw[2] * raw[3] <= 0.4)
     if not mask.any():
         return []
 

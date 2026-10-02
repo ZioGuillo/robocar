@@ -12,6 +12,7 @@
       min-height: 100vh;
       background: #000;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -164,6 +165,15 @@
     .status-dot.ok    { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
     .status-dot.error { background: #e53935; box-shadow: 0 0 6px #e53935; }
 
+    /* ── Footer ── */
+    .login-footer {
+      margin-top: 1.1rem;
+      text-align: center;
+      font-size: 0.7rem;
+      color: #444;
+      max-width: min(380px, 92vw);
+    }
+
     /* ── Mobile ── */
     @media (max-width: 480px) {
       .login-card { padding: 2rem 1.4rem; }
@@ -216,6 +226,8 @@
     <span id="ping-label">Connecting…</span>
   </div>
 </div>
+
+<p class="login-footer">Personal project, unaffiliated with NASA/SpaceX · admin@ibrain.dev</p>
 
 <script>
 /* ── Ping status (real connectivity check, polled every 5s) ──────── */

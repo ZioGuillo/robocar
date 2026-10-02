@@ -356,6 +356,16 @@ function pollTelemetry() {
         if (cpuBar) { cpuBar.style.width = d.cpu_percent + '%'; cpuBar.style.background = _barColor(d.cpu_percent); }
       }
 
+      // GPU (card only present when the board exposes one, e.g. Jetson)
+      var gpuEl    = document.getElementById('tel-gpu');
+      var gpuBar   = document.getElementById('tel-gpu-bar');
+      var gpuClock = document.getElementById('tel-gpu-clock');
+      if (gpuEl && d.gpu_percent != null) {
+        gpuEl.textContent = d.gpu_percent + '%';
+        if (gpuBar) { gpuBar.style.width = d.gpu_percent + '%'; gpuBar.style.background = _barColor(d.gpu_percent); }
+        if (gpuClock && d.gpu_clock_mhz != null) gpuClock.textContent = d.gpu_clock_mhz + ' MHz';
+      }
+
       // RAM
       var ramEl  = document.getElementById('tel-ram');
       var ramBar = document.getElementById('tel-ram-bar');

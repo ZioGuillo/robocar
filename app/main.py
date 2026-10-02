@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import app.routes as _routes_pkg
 from app.config import settings
-from app.hardware import servo_driver, rrb3_driver as driver, camera_driver, ml_driver
+from app.hardware import servo_driver, rrb3_driver as driver, camera_driver, ml_driver, gpu_info
 from app.security import rate_limiter
 from app.templates_env import templates
 from app import db, metrics as m
@@ -173,6 +173,7 @@ async def index(request: Request):
         "camera_stream_url": settings.camera_stream_url,
         "camera_available": camera_driver.available,
         "motor_speed_default": settings.motor_speed_default,
+        "gpu_available": gpu_info.available,
         "user": dict(user),
     }
     if user["role"] == "admin":

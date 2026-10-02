@@ -62,10 +62,15 @@ fi
 
 # ── verify ────────────────────────────────────────────────────────────
 sleep 3
+# Qualified states like "connected (site only)" mean the WiFi link is up
+# even though NetworkManager's own internet-reachability check failed or
+# was inconclusive — only a plain, unprefixed non-"connected*" state here
+# is a real sign something's wrong.
 STATE=$(nmcli -t -f STATE general 2>/dev/null | head -1)
-if [ "$STATE" != "connected" ]; then
-    echo "[wifi-provision] WARNING: nmcli state is '$STATE' — may still be connecting"
-fi
+case "$STATE" in
+    connected*) ;;
+    *) echo "[wifi-provision] WARNING: nmcli state is '$STATE' — may still be connecting" ;;
+esac
 
 # ── clean up: delete wifi.txt so password is not left on disk ────────
 rm -f "$WIFI_FILE"

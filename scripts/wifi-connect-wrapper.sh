@@ -17,10 +17,17 @@ echo "[wifi-connect-fallback] Waiting up to ${WAIT_SECONDS}s for an existing con
 
 elapsed=0
 while [ "$elapsed" -lt "$WAIT_SECONDS" ]; do
-    if [ "$(nmcli -t -f STATE general 2>/dev/null)" = "connected" ]; then
-        echo "[wifi-connect-fallback] Already connected — skipping captive portal"
-        exit 0
-    fi
+    # NetworkManager reports qualified states like "connected (site only)"
+    # or "connected (limited)" when its own internet-reachability check
+    # fails or is inconclusive, even though the WiFi link itself is up and
+    # usable — an exact match against "connected" misses these and
+    # launches the captive portal on a connection that already works.
+    case "$(nmcli -t -f STATE general 2>/dev/null)" in
+        connected*)
+            echo "[wifi-connect-fallback] Already connected — skipping captive portal"
+            exit 0
+            ;;
+    esac
     sleep "$POLL_INTERVAL"
     elapsed=$((elapsed + POLL_INTERVAL))
 done
